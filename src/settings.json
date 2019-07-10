@@ -1,0 +1,9 @@
+{
+    "epochs" : 200,
+    "batchSize" : 32,
+    "learningRate" : 0.002,
+    "images" : "../dataset/images/",
+    "tags" : "../dataset/tags.npy",
+    "tensorboard" : "./info/run1",
+    "save_model" : "./model/run1"
+}
