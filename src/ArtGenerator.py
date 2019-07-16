@@ -5,6 +5,8 @@ import pathlib
 import argparse
 import json
 
+from Model import *
+
 parser = argparse.ArgumentParser(description='Train the model for detecting false positives')
 parser.add_argument('--epochs', type=int, help='The number of epochs to train for', default=150)
 parser.add_argument('--batch_size', type=int, help='The batch size to train on', default=32)
@@ -53,3 +55,32 @@ dataset = dataset.cache(filename='./cache.tf-data')#This helps improve performan
 dataset = dataset.shuffle(5000000)
 dataset = dataset.batch(settings['batchSize'])
 dataset = dataset.prefetch(buffer_size=AUTOTUNE)
+
+#Build models
+with tf.device('/GPU:0'): # Gpu used for training
+    generator = buildGenerator(training=True)
+    discriminator = buildDiscriminator(training=True)
+
+# Losses
+bceLoss = keras.losses.BinaryCrossentropy()
+
+#Optimizers
+generatorOptimizer = keras.optimizers.Adam(settings['learningRate'])
+discriminatorOptimizer = keras.optimizers.Adam(settings['learningRate'])
+
+# Metrics
+discriminatorRealImagesAccuracy = keras.metrics.BinaryAccuracy()
+discriminatorFakeImagesAccuracy = keras.metrics.BinaryAccuracy()
+
+# Train step
+@tf.function
+def trainStep(images, labels):
+    noise = tf.random.normal((images.shape[0], 100))#Makes a random noise distribution of (Batch Size, 100)
+
+# Training
+for epoch in range(settings['epochs']):
+    for images, labels in dataset:
+        trainStep(images, labels)
+        # Reset metrics so the accumalate fresh each step
+        discriminatorRealImagesAccuracy.reset_states()
+        discriminatorFakeImagesAccuracy.reset_states()

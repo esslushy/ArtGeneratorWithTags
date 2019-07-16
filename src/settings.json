@@ -5,5 +5,5 @@
     "images" : "../dataset/images/",
     "tags" : "../dataset/tags.npy",
     "tensorboard" : "./info/run1",
-    "save_model" : "./model/run1"
+    "saveModel" : "./model/run1"
 }
