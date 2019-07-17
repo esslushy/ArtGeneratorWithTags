@@ -9,12 +9,12 @@ from Model import *
 
 parser = argparse.ArgumentParser(description='Train the model for detecting false positives')
 parser.add_argument('--epochs', type=int, help='The number of epochs to train for', default=150)
-parser.add_argument('--batch_size', type=int, help='The batch size to train on', default=32)
-parser.add_argument('--learning_rate', type=float, help='The learning rate of the model', default=0.002)
+parser.add_argument('--batchSize', type=int, help='The batch size to train on', default=32)
+parser.add_argument('--learningRate', type=float, help='The learning rate of the model', default=0.002)
 parser.add_argument('--images', type=str, help='The location to the folder containing the images', default='./dataset/images/')
 parser.add_argument('--tags', type=str, help='The location to the .npy containing the labels', default='./dataset/tags.npy')
-parser.add_argument('--tensorboard', type=str, help='The location to save the .info file for Tensorboard', default='./info')
-parser.add_argument('--save_model', type=str, help='The location to save the model files to during training and at the end', default='./model')
+parser.add_argument('--tensorboardLocation', type=str, help='The location to save the .info file for Tensorboard', default='./info')
+parser.add_argument('--saveModel', type=str, help='The location to save the model files to during training and at the end', default='./model')
 parser.add_argument('--settings', type=str, help='Path to the json files with the settings. Use this instead of passing arguments to make it easier to rerun tests with the same values.', required=True)
 arguments = parser.parse_args()
 
@@ -22,7 +22,7 @@ arguments = parser.parse_args()
 with open(arguments.settings, 'r') as f:
     settings = json.load(f)
 
-# Set global variables
+# Set global step
 gloablStep = 0
 
 # Standardize randomness
@@ -143,7 +143,7 @@ with writer.as_default(): # All summaries made during training will be saved to 
         # Reset metrics so that they accumalate per epoch instead of over the entire training period
         discriminatorRealImagesAccuracy.reset_states()
         discriminatorFakeImagesAccuracy.reset_states()
-        
+
 # Save Final trained models in keras model format for easy reuse
 tf.saved_model.save(generator, settings['saveModel'] + 'generator')
 tf.saved_model.save(discriminator, settings['saveModel'] + 'discriminator')
