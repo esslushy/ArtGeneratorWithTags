@@ -4,6 +4,6 @@
     "learningRate" : 0.002,
     "images" : "../dataset/images/",
     "tags" : "../dataset/tags.npy",
-    "tensorboard" : "./info/run1",
-    "saveModel" : "./model/run1"
+    "tensorboardLocation" : "./info/run1/",
+    "saveModel" : "./model/run1/"
 }
