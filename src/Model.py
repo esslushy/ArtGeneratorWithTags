@@ -9,12 +9,14 @@ def ConvolutionalConcat(inputs, addition):
         return keras.layers.Concatenate()((inputs, additions))# Add the resized additions to the channels or last axis
 
 def TransposeConvolutionLayer(x, filters, kernelSize, strides, training):
-    x = keras.layers.Conv2DTranspose(filters=filters, kernel_size=kernelSize, strides=strides, padding='same')(x)
+    x = keras.layers.Conv2DTranspose(filters=filters, kernel_size=kernelSize, strides=strides, padding='same', 
+                                    kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0, stddev=0.2))(x)
     x = keras.layers.BatchNormalization()(x, training=training)# Training is on this time
     return keras.layers.ReLU()(x)# Relu for generator
     
 def ConvolutionLayer(x, filters, kernelSize, strides, training):
-    x = keras.layers.Conv2D(filters=filters, kernel_size=kernelSize, strides=strides, padding='same')(x)
+    x = keras.layers.Conv2D(filters=filters, kernel_size=kernelSize, strides=strides, padding='same', 
+                            kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0, stddev=0.2))(x)
     x = keras.layers.BatchNormalization()(x, training=training)# Training is on this time
     return keras.layers.LeakyReLU(alpha=0.2)(x)# Leaky relu for discriminator
 

@@ -34,8 +34,10 @@ AUTOTUNE = tf.data.experimental.AUTOTUNE
 
 # Build dataset
 def loadAndPreprocessImage(path):
+    # Load image
     image = tf.io.read_file(path)
     image = tf.image.decode_image(image, dtype=tf.float32)
+    # Resize images
     image = tf.image.resize(image, (256, 256))
     # Normalize to [-1, 1] range
     image = image - (255.0/2.0)
@@ -79,7 +81,7 @@ def calculateMultiscaleStructuralSimilarity(labels):
     as an extra metric during training to make sure the generator is learning properly.
     """
     # Create two sets of noise of size (batchSize, 100)
-    noise1, noise2 = tf.random.normal((labels.shape[0], 100)), tf.random.normal((labels.shape[0], 100))
+    noise1, noise2 = tf.random.normal((labels.shape[0], 100), stddev=0.2), tf.random.normal((labels.shape[0], 100), stddev=0.2)
     # Generate two sets of images
     images1, images2 = generator(noise1), generators(noise2)
     # Calculate the Multiscale Structural Similarity. max_val is 2 because the images range is [-1, 1]
@@ -112,7 +114,7 @@ def discriminatorLabelLoss(realLabelPredictions, fakeLabelPredictions, labels):
 @tf.function
 def trainStep(images, labels):
     # Makes a random noise distribution of (batchSize, 100)
-    noise = tf.random.normal((images.shape[0], 100))
+    noise = tf.random.normal((images.shape[0], 100), stddev=0.2)
     with tf.GradientTape() as tape:
         # Build fake images
         fakeImages = generator(noise, labels)
