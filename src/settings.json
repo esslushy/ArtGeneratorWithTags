@@ -1,7 +1,7 @@
 {
     "epochs" : 200,
-    "batchSize" : 32,
-    "learningRate" : 0.002,
+    "batchSize" : 100,
+    "learningRate" : 0.0002,
     "images" : "../dataset/images/",
     "tags" : "../dataset/tags.npy",
     "tensorboardLocation" : "./info/run1/",

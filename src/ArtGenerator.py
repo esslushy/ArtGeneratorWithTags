@@ -60,49 +60,75 @@ with tf.device('/GPU:0'): # Gpu used for training
     generator = buildGenerator(training=True)
     discriminator = buildDiscriminator(training=True)
 
-# Loss Object
-bceLoss = keras.losses.BinaryCrossentropy()
+# Loss Object. Categorical works with 2 or more
+cceLoss = keras.losses.CategoricalCrossentropy()
 
 #Optimizers
-generatorOptimizer = keras.optimizers.Adam(settings['learningRate'])
-discriminatorOptimizer = keras.optimizers.Adam(settings['learningRate'])
+generatorOptimizer = keras.optimizers.Adam(settings['learningRate'], beta_1=0.5)
+discriminatorOptimizer = keras.optimizers.Adam(settings['learningRate'], beta_1=0.5)
 
 # Metrics
 discriminatorRealImagesAccuracy = keras.metrics.BinaryAccuracy()
 discriminatorFakeImagesAccuracy = keras.metrics.BinaryAccuracy()
 
+@tf.function
+def calculateMultiscaleStructuralSimilarity(labels):
+    """
+    Calculates the similarity between pairs of images made by the generator. Returns a set of values in the range [0, 1] where the closer to
+    1 means the more similar the images. Large values returned from this means there has been mode collapse in the generator. This will be used
+    as an extra metric during training to make sure the generator is learning properly.
+    """
+    # Create two sets of noise of size (batchSize, 100)
+    noise1, noise2 = tf.random.normal((labels.shape[0], 100)), tf.random.normal((labels.shape[0], 100))
+    # Generate two sets of images
+    images1, images2 = generator(noise1), generators(noise2)
+    # Calculate the Multiscale Structural Similarity. max_val is 2 because the images range is [-1, 1]
+    return tf.image.ssim_multiscale(images1, images2, 2)
+
 # Loss functions
 @tf.function
 def generatorLoss(fakePredictions):
     # Ones like because the label for real images is 1, and the generator wants to make its images as realistic as possible
-    return bceLoss(fakePredictions, tf.ones_like(fakePredictions))# Should be a shape of (batchSize, 1)
+    return cceLoss(tf.ones_like(fakePredictions), fakePredictions)# Should be a shape of (batchSize, 1)
 
 @tf.function
 def discriminatorLoss(realPredictions, fakePredictions):
     # Ones like because the label for real images is 1, and the discriminator wants to approach that with its predictions on the real images
-    discriminatorRealLoss = bceLoss(realPredictions, tf.ones_like(realPredictions))# Should be a shape of (batchSize, 1).
+    discriminatorRealLoss = cceLoss(tf.ones_like(realPredictions), realPredictions)# Should be a shape of (batchSize, 1).
     # Zeros like because the label for fake images is 0, and the discriminator wants to approach that with its predictions on the generators images
-    discriminatorFakeLoss = bceLoss(fakePredictions, tf.zeros_like(fakePredictions))# Should be a shape of (batchSize, 1).
-    # Add losses together to pass to optimizer
-    discriminatorTotalLoss = discriminatorRealLoss + discriminatorFakeLoss
-    return discriminatorRealLoss, discriminatorFakeLoss, discriminatorTotalLoss
+    discriminatorFakeLoss = cceLoss(tf.zeros_like(fakePredictions), fakePredictions)# Should be a shape of (batchSize, 1).
+    return discriminatorRealLoss, discriminatorFakeLoss
+
+@tf.function
+def discriminatorLabelLoss(realLabelPredictions, fakeLabelPredictions, labels):
+    # According to paper both are compared to the same labels https://arxiv.org/pdf/1610.09585.pdf
+    # Finds discriminator's ability to guess labels
+    discriminatorRealLabelLoss = cceLoss(labels, realLabelPredictions)
+    # Finds both generator's ability to create the right labels and the discriminator's ability to guess them. 
+    discriminatorFakeLabelLoss = cceLoss(labels, fakeLabelPredictions)
+    return discriminatorRealLabelLoss, discriminatorFakeLabelLoss
 
 # Train step
 @tf.function
 def trainStep(images, labels):
-    noise = tf.random.normal((images.shape[0], 100))#Makes a random noise distribution of (batchSize, 100)
+    # Makes a random noise distribution of (batchSize, 100)
+    noise = tf.random.normal((images.shape[0], 100))
     with tf.GradientTape() as tape:
         # Build fake images
         fakeImages = generator(noise, labels)
         # Get discriminator predictions
-        realPredictions = discriminator(images, labels)
-        fakePredictions = discriminator(fakeImages, labels)
+        realPredictions, realLabelPredictions = discriminator(images)
+        fakePredictions, fakeLabelPredictions = discriminator(fakeImages)
         # Calculate losses
         genLoss = generatorLoss(fakePredictions)
-        discRealLoss, discFakeLoss, discTotalLoss = discriminatorLoss(realPredictions, fakePredictions)
+        discRealLoss, discFakeLoss = discriminatorLoss(realPredictions, fakePredictions)
+        discRealLabelLoss, discFakeLabelLoss = discriminatorLabelLoss(realLabelPredictions, fakeLabelPredictions, labels)
+        # Sum Losses. 
+        genTotalLoss = genLoss + discFakeLabelLoss
+        discTotalLoss = discRealLoss + discFakeLoss + discRealLabelLoss + discFakeLabelLoss
 
     # Collect Gradients
-    generatorGradients = tape.gradient(genLoss, generator.trainable_variables)
+    generatorGradients = tape.gradient(genTotalLoss, generator.trainable_variables)
     discriminatorGradients = tape.gradient(discTotalLoss, discriminator.trainable_variables)
 
     # Run Optimizers
@@ -113,12 +139,20 @@ def trainStep(images, labels):
     discriminatorRealImagesAccuracy.update_state(tf.ones_like(realPredictions), realPredictions)
     discriminatorFakeImagesAccuracy.update_state(tf.zeros_like(fakePredictions), fakePredictions)
 
+    # Calculate Multiscale Structural Similarity in Generator.
+    ssim = calculateMultiscaleStructuralSimilarity(labels)
+
     # Log to tensorboard
     tf.summary.scalar('Discriminator_Real_Images_Loss', tf.reduce_mean(discRealLoss), step=gloablStep)
     tf.summary.scalar('Discriminator_Fake_Images_Loss', tf.reduce_mean(discFakeLoss), step=gloablStep)
-    tf.summary.scalar('Discriminator_Real_Images_Accuracy', discriminatorRealImagesAccuracy.result().numpy(), step=gloablStep)
-    tf.summary.scalar('Discriminator_Fake_Images_Accuracy', discriminatorFakeImagesAccuracy.result().numpy(), step=gloablStep)
-    tf.summary.scalar('Generator_Loss', tf.reduce_mean(genLoss), step=gloablStep)
+    tf.summary.scalar('Discriminator_Real_Image_Labels_Loss', tf.reduce_mean(discRealLabelLoss), step=gloablStep)
+    tf.summary.scalar('Discriminator_And_Generator_Fake_Image_Labels_Loss', tf.reduce_mean(discFakeLabelLoss), step=gloablStep)# Applies to both
+    tf.summary.scalar('Discriminator_Total_Loss', tf.reduce_mean(discTotalLoss), step=globalStep)
+    tf.summary.scalar('Discriminator_Real_Images_Accuracy', discriminatorRealImagesAccuracy.result(), step=gloablStep)
+    tf.summary.scalar('Discriminator_Fake_Images_Accuracy', discriminatorFakeImagesAccuracy.result(), step=gloablStep)
+    tf.summary.scalar('Generator_Realism_Loss', tf.reduce_mean(genLoss), step=gloablStep)
+    tf.summary.scalar('Generator_Total_Loss', tf.reduce_mean(genTotalLoss), step=globalStep)
+    tf.summary.scalar('Generator_Mode_Collapse_Percentage', tf.reduce_mean(ssim), step=globalStep)
     tf.summary.image('Generated_Images', fakeImages, max_outputs=8, step=gloablStep)
 
 # Checkpoint Model
