@@ -5,14 +5,14 @@ import pathlib
 import argparse
 import json
 
-from Model import *
+from Model import buildDiscriminator, buildGenerator
 
 parser = argparse.ArgumentParser(description='Train the model for detecting false positives')
 parser.add_argument('--epochs', type=int, help='The number of epochs to train for', default=150)
 parser.add_argument('--batchSize', type=int, help='The batch size to train on', default=32)
 parser.add_argument('--learningRate', type=float, help='The learning rate of the model', default=0.002)
-parser.add_argument('--images', type=str, help='The location to the folder containing the images', default='./dataset/images/')
-parser.add_argument('--tags', type=str, help='The location to the .npy containing the labels', default='./dataset/tags.npy')
+parser.add_argument('--images', type=str, help='The location to the folder containing the images', default='../dataset/images/')
+parser.add_argument('--labels', type=str, help='The location to the .npy containing the labels', default='../dataset/labels.npy')
 parser.add_argument('--tensorboardLocation', type=str, help='The location to save the .info file for Tensorboard', default='./info')
 parser.add_argument('--saveModel', type=str, help='The location to save the model files to during training and at the end', default='./model')
 parser.add_argument('--settings', type=str, help='Path to the json files with the settings. Use this instead of passing arguments to make it easier to rerun tests with the same values.', required=True)
@@ -23,7 +23,7 @@ with open(arguments.settings, 'r') as f:
     settings = json.load(f)
 
 # Set global step
-gloablStep = 0
+globalStep = 0
 
 # Standardize randomness
 tf.random.set_seed(7)
@@ -35,9 +35,9 @@ AUTOTUNE = tf.data.experimental.AUTOTUNE
 # Build dataset
 def loadAndPreprocessImage(path):
     # Load image
-    image = tf.io.read_file(path)
-    image = tf.image.decode_image(image, dtype=tf.float32)
-    # Resize images
+    image = tf.io.read_file(settings['images'] + path)
+    print(image)
+    image = tf.image.decode_jpeg(image, channels=3)
     image = tf.image.resize(image, (256, 256))
     # Normalize to [-1, 1] range
     image = image - (255.0/2.0)
@@ -45,10 +45,9 @@ def loadAndPreprocessImage(path):
     return image
 
 # Get tags and load into a tensorflow dataset
-tagDataset = tf.data.Dataset.from_tensor_slices(tf.cast(np.load(settings['tags']), tf.float32))#float 32 used for compatible typing
-# Get all locations of pictures and load into the dataset
-imageRoot = pathlib.Path(settings['images'])#lets use get images from the folder
-imageDataset = tf.data.Dataset.from_tensor_slices([str(path) for path in imageRoot.iterdir()])#Gets all image paths
+tagDataset = tf.data.Dataset.from_tensor_slices(tf.cast(np.load(settings['labels']), tf.float32))#float 32 used for compatible typing
+# Load names of all images in order with tags and then read and preprocess them
+imageDataset = tf.data.Dataset.from_tensor_slices(np.load(settings['imageNames']))#Gets all image paths
 imageDataset = imageDataset.map(loadAndPreprocessImage, num_parallel_calls=AUTOTUNE)# Places images into datast
 dataset = tf.data.Dataset.zip((imageDataset, tagDataset))
 # Prep dataset for training
@@ -83,7 +82,7 @@ def calculateMultiscaleStructuralSimilarity(labels):
     # Create two sets of noise of size (batchSize, 100)
     noise1, noise2 = tf.random.normal((labels.shape[0], 100), stddev=0.2), tf.random.normal((labels.shape[0], 100), stddev=0.2)
     # Generate two sets of images
-    images1, images2 = generator(noise1), generators(noise2)
+    images1, images2 = generator(noise1), generator(noise2)
     # Calculate the Multiscale Structural Similarity. max_val is 2 because the images range is [-1, 1]
     return tf.image.ssim_multiscale(images1, images2, 2)
 
@@ -134,8 +133,8 @@ def trainStep(images, labels):
     discriminatorGradients = tape.gradient(discTotalLoss, discriminator.trainable_variables)
 
     # Run Optimizers
-    generatorOptimizer(zip(generatorGradients, generator.trainable_variables))
-    discriminatorOptimizer(zip(discriminatorGradients, discriminator.trainable_variables))
+    generatorOptimizer.apply_gradients(zip(generatorGradients, generator.trainable_variables))
+    discriminatorOptimizer.apply_gradients(zip(discriminatorGradients, discriminator.trainable_variables))
 
     # Accumalate Metrics
     discriminatorRealImagesAccuracy.update_state(tf.ones_like(realPredictions), realPredictions)
@@ -145,17 +144,17 @@ def trainStep(images, labels):
     ssim = calculateMultiscaleStructuralSimilarity(labels)
 
     # Log to tensorboard
-    tf.summary.scalar('Discriminator_Real_Images_Loss', tf.reduce_mean(discRealLoss), step=gloablStep)
-    tf.summary.scalar('Discriminator_Fake_Images_Loss', tf.reduce_mean(discFakeLoss), step=gloablStep)
-    tf.summary.scalar('Discriminator_Real_Image_Labels_Loss', tf.reduce_mean(discRealLabelLoss), step=gloablStep)
-    tf.summary.scalar('Discriminator_And_Generator_Fake_Image_Labels_Loss', tf.reduce_mean(discFakeLabelLoss), step=gloablStep)# Applies to both
+    tf.summary.scalar('Discriminator_Real_Images_Loss', tf.reduce_mean(discRealLoss), step=globalStep)
+    tf.summary.scalar('Discriminator_Fake_Images_Loss', tf.reduce_mean(discFakeLoss), step=globalStep)
+    tf.summary.scalar('Discriminator_Real_Image_Labels_Loss', tf.reduce_mean(discRealLabelLoss), step=globalStep)
+    tf.summary.scalar('Discriminator_And_Generator_Fake_Image_Labels_Loss', tf.reduce_mean(discFakeLabelLoss), step=globalStep)# Applies to both
     tf.summary.scalar('Discriminator_Total_Loss', tf.reduce_mean(discTotalLoss), step=globalStep)
-    tf.summary.scalar('Discriminator_Real_Images_Accuracy', discriminatorRealImagesAccuracy.result(), step=gloablStep)
-    tf.summary.scalar('Discriminator_Fake_Images_Accuracy', discriminatorFakeImagesAccuracy.result(), step=gloablStep)
-    tf.summary.scalar('Generator_Realism_Loss', tf.reduce_mean(genLoss), step=gloablStep)
+    tf.summary.scalar('Discriminator_Real_Images_Accuracy', discriminatorRealImagesAccuracy.result(), step=globalStep)
+    tf.summary.scalar('Discriminator_Fake_Images_Accuracy', discriminatorFakeImagesAccuracy.result(), step=globalStep)
+    tf.summary.scalar('Generator_Realism_Loss', tf.reduce_mean(genLoss), step=globalStep)
     tf.summary.scalar('Generator_Total_Loss', tf.reduce_mean(genTotalLoss), step=globalStep)
     tf.summary.scalar('Generator_Mode_Collapse_Percentage', tf.reduce_mean(ssim), step=globalStep)
-    tf.summary.image('Generated_Images', fakeImages, max_outputs=8, step=gloablStep)
+    tf.summary.image('Generated_Images', fakeImages, max_outputs=8, step=globalStep)
 
 # Checkpoint Model
 checkpoint = tf.train.Checkpoint(generatorOptimizer=generatorOptimizer, discriminatorOptimizer=discriminatorOptimizer,
@@ -166,19 +165,19 @@ manager = tf.train.CheckpointManager(checkpoint, directory=settings['saveModel']
 writer = tf.summary.create_file_writer(settings['tensorboardLocation'])
 
 # Training
-with writer.as_default(): # All summaries made during training will be saved to this writer
-    for epoch in range(settings['epochs']):
-        for images, labels in dataset:
-            # Train model and update tensorboard
+for epoch in range(settings['epochs']):
+    for images, labels in dataset:
+        # Train model and update tensorboard
+        with writer.as_default(): # All summaries made during training will be saved to this writer
             trainStep(images, labels)
-            # Increment global step for logging to tensorboard
-            gloablStep+=1
+        # Increment global step for logging to tensorboard
+        globalStep+=1
 
-        # Checkpoint model each epoch
-        manager.save(checkpoint_number=epoch)
-        # Reset metrics so that they accumalate per epoch instead of over the entire training period
-        discriminatorRealImagesAccuracy.reset_states()
-        discriminatorFakeImagesAccuracy.reset_states()
+    # Checkpoint model each epoch
+    manager.save(checkpoint_number=epoch)
+    # Reset metrics so that they accumalate per epoch instead of over the entire training period
+    discriminatorRealImagesAccuracy.reset_states()
+    discriminatorFakeImagesAccuracy.reset_states()
 
 # Save Final trained models in keras model format for easy reuse
 tf.saved_model.save(generator, settings['saveModel'] + 'generator')

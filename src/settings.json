@@ -3,7 +3,8 @@
     "batchSize" : 100,
     "learningRate" : 0.0002,
     "images" : "../dataset/images/",
-    "tags" : "../dataset/tags.npy",
+    "imageNames" : "../dataset/imageLocation.npy",
+    "labels" : "../dataset/labels.npy",
     "tensorboardLocation" : "./info/run1/",
     "saveModel" : "./model/run1/"
 }

@@ -6,7 +6,7 @@ def ConvolutionalConcat(inputs, addition):
     with tf.name_scope('Convolutional_Concat'):
         addition = keras.layers.RepeatVector(inputs.shape[1] * inputs.shape[2])(addition)# Repeat addition so that it can be reshaped into a 3d shape and appended
         addition = keras.layers.Reshape((inputs.shape[1], inputs.shape[2], addition.shape[-1]))(addition)# Reshapes so it can be added. addition.shape[-1] is the channel width
-        return keras.layers.Concatenate()((inputs, additions))# Add the resized additions to the channels or last axis
+        return keras.layers.Concatenate()([inputs, addition])# Add the resized additions to the channels or last axis
 
 def TransposeConvolutionLayer(x, filters, kernelSize, strides, training):
     x = keras.layers.Conv2DTranspose(filters=filters, kernel_size=kernelSize, strides=strides, padding='same', 
@@ -24,8 +24,8 @@ def ConvolutionLayer(x, filters, kernelSize, strides, training):
 def buildGenerator(training):
     with tf.name_scope('Generator'):
         with tf.name_scope('Reshape_and_Project_Inputs'):
-            noiseInputs = keras.Input(shape=(None, 100))#Noise input
-            labelInputs = keras.Input(shape=(None, 20))#Label input
+            noiseInputs = keras.Input(shape=(100))# Noise input
+            labelInputs = keras.Input(shape=(177))# Label input.
             noiseAndLabels = keras.layers.Concatenate()([noiseInputs, labelInputs])# Adds on label depth
             noise = keras.layers.Dense(4*4*1024)(noiseAndLabels)# Project it across enough values to give enough attributes for a 3d shape
             reshapedNoise = keras.layers.Reshape((4, 4, 1024))(noise)# Reshape noise into a 3d shape
@@ -66,9 +66,9 @@ def buildGenerator(training):
 def buildDiscriminator(training):
     with tf.name_scope('Discriminator'):
         with tf.name_scope('Input'):
-            imageInputs = keras.Input(shape=(None, 256, 256, 3))#Noise input
+            imageInputs = keras.Input(shape=(256, 256, 3))#Noise input
         with tf.name_scope('Convolutional_Layer_1'):
-            x = keras.layers.Conv2D(filters=4, kernel_size=5, strides=1, padding='same')(x)# 256x256x3 ->256x256x4
+            x = keras.layers.Conv2D(filters=4, kernel_size=5, strides=1, padding='same')(imageInputs)# 256x256x3 ->256x256x4
             # No batch norm in first layer according to the paper.
             x = keras.layers.LeakyReLU(alpha=0.2)(x)
         with tf.name_scope('Convolutional_Layer_2'):
@@ -78,11 +78,10 @@ def buildDiscriminator(training):
         with tf.name_scope('Convolutional_Layer_4'):
             x = ConvolutionLayer(x, 32, 5, 2, training)# 256x256x16 -> 128x128x32
         with tf.name_scope('Convolutional_Layer_5'):
-            x = ConvolutionLayer(x, 64, 5, 2)# 128x128x32 -> 64x64x64
+            x = ConvolutionLayer(x, 64, 5, 2, training)# 128x128x32 -> 64x64x64
         with tf.name_scope('Convolutional_Layer_6'):
             x = ConvolutionLayer(x, 128, 5, 2, training)# 64x64x64 -> 32x32x128
         with tf.name_scope('Convolutional_Layer_7'):
-            x = ConvolutionalConcat(x, labelInputs)
             x = ConvolutionLayer(x, 256, 5, 2, training)# 32x32x128 -> 16x16x256
         with tf.name_scope('Convolutional_Layer_8'):
             x = ConvolutionLayer(x, 512, 5, 2, training)# 16x16x256 -> 8x8x512
