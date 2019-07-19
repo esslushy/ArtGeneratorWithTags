@@ -49,7 +49,7 @@ imageDataset = tf.data.Dataset.from_tensor_slices(np.load(settings['imageNames']
 imageDataset = imageDataset.map(loadAndPreprocessImage, num_parallel_calls=AUTOTUNE)# Places images into datast
 dataset = tf.data.Dataset.zip((imageDataset, tagDataset))
 # Prep dataset for training
-dataset = dataset.cache(filename='./cache/cache.tf-data')#This helps improve performance if data doesnt fit in memory
+dataset = dataset.cache()#This helps improve performance if data doesnt fit in memory
 dataset = dataset.batch(settings['batchSize'])
 dataset = dataset.prefetch(buffer_size=AUTOTUNE)
 
@@ -111,7 +111,7 @@ def discriminatorLabelLoss(realLabelPredictions, fakeLabelPredictions, labels):
 def trainStep(images, labels):
     # Makes a random noise distribution of (batchSize, 100)
     noise = tf.random.normal((images.shape[0], 100), stddev=0.2)
-    with tf.GradientTape() as tape:
+    with tf.GradientTape() as generatorTape, tf.GradientTape() as discriminatorTape:
         # Build fake images
         fakeImages = generator((noise, labels))
         # Get discriminator predictions
@@ -126,8 +126,8 @@ def trainStep(images, labels):
         discTotalLoss = discRealLoss + discFakeLoss + discRealLabelLoss + discFakeLabelLoss
 
     # Collect Gradients
-    generatorGradients = tape.gradient(genTotalLoss, generator.trainable_variables)
-    discriminatorGradients = tape.gradient(discTotalLoss, discriminator.trainable_variables)
+    generatorGradients = generatorTape.gradient(genTotalLoss, generator.trainable_variables)
+    discriminatorGradients = discriminatorTape.gradient(discTotalLoss, discriminator.trainable_variables)
 
     # Run Optimizers
     generatorOptimizer.apply_gradients(zip(generatorGradients, generator.trainable_variables))
