@@ -51,8 +51,8 @@ imageDataset = tf.data.Dataset.from_tensor_slices(np.load(settings['imageNames']
 imageDataset = imageDataset.map(loadAndPreprocessImage, num_parallel_calls=AUTOTUNE)# Places images into datast
 dataset = tf.data.Dataset.zip((imageDataset, tagDataset))
 # Prep dataset for training
-dataset = dataset.cache(filename='./cache.tf-data')#This helps improve performance if data doesnt fit in memory
-dataset = dataset.shuffle(5000000)
+dataset = dataset.cache(filename='./cache/cache.tf-data')#This helps improve performance if data doesnt fit in memory
+dataset = dataset.shuffle(125000)
 dataset = dataset.batch(settings['batchSize'])
 dataset = dataset.prefetch(buffer_size=AUTOTUNE)
 
