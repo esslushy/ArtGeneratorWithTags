@@ -1,6 +1,8 @@
 import tensorflow as tf
 from tensorflow import keras
 
+labelSize = 177
+
 # Custom Layers
 def ConvolutionalConcat(inputs, addition):
     with tf.name_scope('Convolutional_Concat'):
@@ -25,7 +27,7 @@ def buildGenerator(training):
     with tf.name_scope('Generator'):
         with tf.name_scope('Reshape_and_Project_Inputs'):
             noiseInputs = keras.Input(shape=(100))# Noise input
-            labelInputs = keras.Input(shape=(177))# Label input.
+            labelInputs = keras.Input(shape=(labelSize))# Label input.
             noiseAndLabels = keras.layers.Concatenate()([noiseInputs, labelInputs])# Adds on label depth
             noise = keras.layers.Dense(4*4*1024)(noiseAndLabels)# Project it across enough values to give enough attributes for a 3d shape
             reshapedNoise = keras.layers.Reshape((4, 4, 1024))(noise)# Reshape noise into a 3d shape
@@ -92,6 +94,6 @@ def buildDiscriminator(training):
         with tf.name_scope('Ouputs'):
             x = keras.layers.Flatten()(x) # Flatten out inputs into a 1d array of (Batch Size, 4x4x1024)
             out = keras.layers.Dense(1, activation=keras.activations.sigmoid)(x) # Compress into 1 output label between 0 (fake image) and 1 (real image) for classification
-            labels = keras.layers.Dense(10, activation=keras.activations.sigmoid)(x)# Multiple classes are true so use sigmoid instead of softmax
+            labels = keras.layers.Dense(labelSize, activation=keras.activations.sigmoid)(x)# Multiple classes are true so use sigmoid instead of softmax
     discriminator = keras.Model(inputs=imageInputs, outputs=[out, labels])# Build model
     return discriminator

@@ -109,3 +109,5 @@ venv.bak/
 #Custom
 dataset/
 cache/
+info/
+model/

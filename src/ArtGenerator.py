@@ -1,7 +1,6 @@
 import tensorflow as tf
 from tensorflow import keras
 import numpy as np
-import pathlib
 import argparse
 import json
 
@@ -36,9 +35,8 @@ AUTOTUNE = tf.data.experimental.AUTOTUNE
 def loadAndPreprocessImage(path):
     # Load image
     image = tf.io.read_file(settings['images'] + path)
-    print(image)
     image = tf.image.decode_jpeg(image, channels=3)
-    image = tf.image.resize(image, (256, 256))
+    image = tf.cast(image, tf.float32)
     # Normalize to [-1, 1] range
     image = image - (255.0/2.0)
     image = image / (255.0/2.0)
@@ -52,7 +50,6 @@ imageDataset = imageDataset.map(loadAndPreprocessImage, num_parallel_calls=AUTOT
 dataset = tf.data.Dataset.zip((imageDataset, tagDataset))
 # Prep dataset for training
 dataset = dataset.cache(filename='./cache/cache.tf-data')#This helps improve performance if data doesnt fit in memory
-dataset = dataset.shuffle(125000)
 dataset = dataset.batch(settings['batchSize'])
 dataset = dataset.prefetch(buffer_size=AUTOTUNE)
 
@@ -116,7 +113,7 @@ def trainStep(images, labels):
     noise = tf.random.normal((images.shape[0], 100), stddev=0.2)
     with tf.GradientTape() as tape:
         # Build fake images
-        fakeImages = generator(noise, labels)
+        fakeImages = generator((noise, labels))
         # Get discriminator predictions
         realPredictions, realLabelPredictions = discriminator(images)
         fakePredictions, fakeLabelPredictions = discriminator(fakeImages)
@@ -166,6 +163,7 @@ writer = tf.summary.create_file_writer(settings['tensorboardLocation'])
 
 # Training
 for epoch in range(settings['epochs']):
+    print('On Epoch: ', epoch)
     for images, labels in dataset:
         # Train model and update tensorboard
         with writer.as_default(): # All summaries made during training will be saved to this writer
