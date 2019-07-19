@@ -90,7 +90,7 @@ def buildDiscriminator(training):
             keras.layers.BatchNormalization()(x, training=training)
             #Output uses sigmoid for classification no leaky relu
         with tf.name_scope('Ouputs'):
-            x = keras.layers.Reshape((-1))(x) # Flatten out inputs into a 1d array of (Batch Size, 4x4x1024)
+            x = keras.layers.Flatten()(x) # Flatten out inputs into a 1d array of (Batch Size, 4x4x1024)
             out = keras.layers.Dense(1, activation=keras.activations.sigmoid)(x) # Compress into 1 output label between 0 (fake image) and 1 (real image) for classification
             labels = keras.layers.Dense(10, activation=keras.activations.sigmoid)(x)# Multiple classes are true so use sigmoid instead of softmax
     discriminator = keras.Model(inputs=imageInputs, outputs=[out, labels])# Build model
