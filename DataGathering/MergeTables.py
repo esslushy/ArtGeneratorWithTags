@@ -6,7 +6,6 @@ import cv2
 
 #connect to database with images and links
 conn = sqlite3.connect('../dataset/BamImages.sqlite')
-outConn = sqlite3.connect('../dataset/info.sqlite')
 #read from tables with the tags and links
 IDwithInfo = pd.read_sql(sql='select * from automatic_labels;', con=conn)
 IDwithLink = pd.read_sql(sql='select * from modules;', con=conn)
