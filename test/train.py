@@ -144,8 +144,6 @@ manager = tf.train.CheckpointManager(checkpoint, directory=settings['saveModel']
 
 # Summary Writer
 writer = tf.summary.create_file_writer(settings['tensorboardLocation'])
-# Graph Writer
-tf.summary.trace_on(graph=True, profiler=True)
 # Set Global Step
 tf.summary.experimental.set_step(0)
 
@@ -156,7 +154,6 @@ for epoch in range(settings['epochs']):
         # Train model and update tensorboard
         with tf.device('/cpu:0'):
             with writer.as_default(): # All summaries made during training will be saved to this writer
-                tf.summary.trace_export(name='DCGAN', step=0, profiler_outdir=settings['tensorboardLocation'])
                 trainStep(images)
 
     # Checkpoint model each epoch
