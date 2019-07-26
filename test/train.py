@@ -82,15 +82,15 @@ def calculateMultiscaleStructuralSimilarity():
 # Loss functions
 def generatorLoss(fakeLogits, ssim):
     # Ones like because the label for real images is 1, and the generator wants to make its images as realistic as possible
-    genLoss = bceLoss(tf.ones_like(fakeLogits), fakeLogits)# Should be a shape of (batchSize, 1)
+    genLoss = bceLoss(tf.ones_like(fakeLogits), fakeLogits + 1e-8)# Should be a shape of (batchSize, 1)
     ssimLoss = bceLoss(tf.zeros_like(ssim), ssim)
     return genLoss, ssimLoss
 
 def discriminatorLoss(realLogits, fakeLogits):
     # Ones like because the label for real images is 1, and the discriminator wants to approach that with its predictions on the real images
-    discriminatorRealLoss = bceLoss(tf.ones_like(realLogits), realLogits)# Should be a shape of (batchSize, 1).
+    discriminatorRealLoss = bceLoss(tf.ones_like(realLogits), realLogits + 1e-8)# Should be a shape of (batchSize, 1).
     # Zeros like because the label for fake images is 0, and the discriminator wants to approach that with its predictions on the generators images
-    discriminatorFakeLoss = bceLoss(tf.zeros_like(fakeLogits), fakeLogits)# Should be a shape of (batchSize, 1).
+    discriminatorFakeLoss = bceLoss(tf.zeros_like(fakeLogits), fakeLogits + 1e-8)# Should be a shape of (batchSize, 1).
     return discriminatorRealLoss, discriminatorFakeLoss
 
 # Train step
@@ -107,12 +107,12 @@ def trainStep(images, globalStep):
             fakePredictions, fakeLogits = discriminator(fakeImages)
             # Calculate Multiscale Structural Similarity in Generator.
             ssim = calculateMultiscaleStructuralSimilarity()
-        # Calculate losses
-        genLoss, genSimilarityLoss = generatorLoss(fakeLogits, ssim)
-        discRealLoss, discFakeLoss = discriminatorLoss(realLogits, fakeLogits)
-        # Sum Losses. 
-        genTotalLoss = genLoss + genSimilarityLoss
-        discTotalLoss = discRealLoss + discFakeLoss
+            # Calculate losses
+            genLoss, genSimilarityLoss = generatorLoss(fakeLogits, ssim)
+            discRealLoss, discFakeLoss = discriminatorLoss(realLogits, fakeLogits)
+            # Sum Losses. 
+            genTotalLoss = genLoss + genSimilarityLoss
+            discTotalLoss = discRealLoss + discFakeLoss
 
     # Collect Gradients
     generatorGradients = generatorTape.gradient(genTotalLoss, generator.trainable_variables)
@@ -136,7 +136,8 @@ def trainStep(images, globalStep):
     tf.summary.scalar('Generator_Mode_Collapse_Loss', tf.reduce_mean(genSimilarityLoss), step=globalStep)
     tf.summary.scalar('Generator_Total_Loss', tf.reduce_mean(genTotalLoss), step=globalStep)
     tf.summary.scalar('Generator_Mode_Collapse_Percentage', tf.reduce_mean(ssim), step=globalStep)
-    tf.summary.image('Generated_Images', fakeImages, max_outputs=8, step=globalStep)
+    with tf.device('/cpu:0'): # Necessary for images
+        tf.summary.image('Generated_Images', fakeImages, max_outputs=8, step=globalStep)
 
 # Checkpoint Model
 checkpoint = tf.train.Checkpoint(generatorOptimizer=generatorOptimizer, discriminatorOptimizer=discriminatorOptimizer,
@@ -153,11 +154,10 @@ for epoch in range(settings['epochs']):
     print('On Epoch: ', epoch)
     for images in dataset:
         # Train model and update tensorboard
-        with tf.device('/cpu:0'):
-            with writer.as_default(): # All summaries made during training will be saved to this writer
-                trainStep(images, globalStep)
-                # Increment global step
-                globalStep+=1
+        with writer.as_default(): # All summaries made during training will be saved to this writer
+            trainStep(images, globalStep)
+            # Increment global step
+            globalStep+=1
 
     # Checkpoint model each epoch
     manager.save(checkpoint_number=epoch)

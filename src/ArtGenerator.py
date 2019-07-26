@@ -84,21 +84,21 @@ def calculateMultiscaleStructuralSimilarity(labels):
 # Loss functions
 def generatorLoss(fakeLogits):
     # Ones like because the label for real images is 1, and the generator wants to make its images as realistic as possible
-    return bceLoss(tf.ones_like(fakeLogits), fakeLogits)# Should be a shape of (batchSize, 1)
+    return bceLoss(tf.ones_like(fakeLogits), fakeLogits + 1e-8)# Should be a shape of (batchSize, 1)
 
 def discriminatorLoss(realLogits, fakeLogits):
     # Ones like because the label for real images is 1, and the discriminator wants to approach that with its predictions on the real images
-    discriminatorRealLoss = bceLoss(tf.ones_like(realLogits), realLogits)# Should be a shape of (batchSize, 1).
+    discriminatorRealLoss = bceLoss(tf.ones_like(realLogits), realLogits + 1e-8)# Should be a shape of (batchSize, 1).
     # Zeros like because the label for fake images is 0, and the discriminator wants to approach that with its predictions on the generators images
-    discriminatorFakeLoss = bceLoss(tf.zeros_like(fakeLogits), fakeLogits)# Should be a shape of (batchSize, 1).
+    discriminatorFakeLoss = bceLoss(tf.zeros_like(fakeLogits), fakeLogits + 1e-8)# Should be a shape of (batchSize, 1).
     return discriminatorRealLoss, discriminatorFakeLoss
 
 def discriminatorLabelLoss(realLabelLogits, fakeLabelLogits, labels):
     # According to paper both are compared to the same labels https://arxiv.org/pdf/1610.09585.pdf
     # Finds discriminator's ability to guess labels
-    discriminatorRealLabelLoss = bceLoss(labels, realLabelLogits)
+    discriminatorRealLabelLoss = bceLoss(labels, realLabelLogits + 1e-8)
     # Finds both generator's ability to create the right labels and the discriminator's ability to guess them. 
-    discriminatorFakeLabelLoss = bceLoss(labels, fakeLabelLogits)
+    discriminatorFakeLabelLoss = bceLoss(labels, fakeLabelLogits + 1e-8)
     return discriminatorRealLabelLoss, discriminatorFakeLabelLoss
 
 # Train step
@@ -146,7 +146,8 @@ def trainStep(images, labels):
     tf.summary.scalar('Generator_Realism_Loss', tf.reduce_mean(genLoss), step=globalStep)
     tf.summary.scalar('Generator_Total_Loss', tf.reduce_mean(genTotalLoss), step=globalStep)
     tf.summary.scalar('Generator_Mode_Collapse_Percentage', tf.reduce_mean(ssim), step=globalStep)
-    tf.summary.image('Generated_Images', fakeImages, max_outputs=8, step=globalStep)   
+    tf.summary.image('Generated_Images', fakeImages, max_outputs=8, step=globalStep)
+    
 
 # Checkpoint Model
 checkpoint = tf.train.Checkpoint(generatorOptimizer=generatorOptimizer, discriminatorOptimizer=discriminatorOptimizer,
