@@ -41,7 +41,7 @@ def buildGenerator(training):
             # No Batch Norm or Leaky Relu in last layer
         with tf.name_scope('Output'):
             outImages = keras.layers.Activation(keras.activations.tanh)(x) # Tanh used to normalize to [-1, 1] range
-    generator = keras.Model(inputs=noiseInputs, outputs=outImages) # Construct model
+    generator = keras.Model(inputs=[noiseInputs], outputs=[outImages]) # Construct model
     return generator
     
 # Discriminator Builder
@@ -72,7 +72,7 @@ def buildDiscriminator(training):
             keras.layers.BatchNormalization()(x, training=training)
             #Output uses sigmoid for classification no leaky relu
         with tf.name_scope('Ouputs'):
-            x = keras.layers.Flatten()(x) # Flatten out inputs into a 1d array of (Batch Size, 4x4x1024)
-            out = keras.layers.Dense(1, activation=keras.activations.sigmoid)(x) # Compress into 1 output label between 0 (fake image) and 1 (real image) for classification
-    discriminator = keras.Model(inputs=imageInputs, outputs=out)# Build model
+            logits = keras.layers.Flatten()(x) # Flatten out inputs into a 1d array of (Batch Size, 4x4x1024)
+            out = keras.layers.Dense(1, activation=keras.activations.sigmoid)(logits) # Compress into 1 output label between 0 (fake image) and 1 (real image) for classification
+    discriminator = keras.Model(inputs=[imageInputs], outputs=[out, logits])# Build model
     return discriminator
