@@ -2,8 +2,8 @@
     "epochs" : 200,
     "batchSize" : 50,
     "learningRate" : 0.0002,
-    "images" : "../dataset/images/",
-    "imageNames" : "../dataset/imageLocation.npy",
-    "tensorboardLocation" : "./info/run1/",
-    "saveModel" : "./model/run1/"
+    "images" : "..\\dataset\\images\\",
+    "imageNames" : "..\\dataset\\imageLocation.npy",
+    "tensorboardLocation" : ".\\info\\run1\\",
+    "saveModel" : ".\\model\\run1\\"
 }

@@ -53,7 +53,7 @@ generator = buildGenerator(training=True)
 discriminator = buildDiscriminator(training=True)
 
 # Loss Object. Categorical works with 2 or more
-bceLoss = keras.losses.BinaryCrossentropy()
+bceLoss = keras.losses.BinaryCrossentropy(from_logits=True)
 
 #Optimizers
 generatorOptimizer = keras.optimizers.Adam(settings['learningRate'], beta_1=0.5)
@@ -77,17 +77,17 @@ def calculateMultiscaleStructuralSimilarity():
     return tf.image.ssim_multiscale(images1, images2, 2)
 
 # Loss functions
-def generatorLoss(fakePredictions, ssim):
+def generatorLoss(fakeLogits, ssim):
     # Ones like because the label for real images is 1, and the generator wants to make its images as realistic as possible
-    genLoss = bceLoss(tf.ones_like(fakePredictions), fakePredictions)# Should be a shape of (batchSize, 1)
+    genLoss = bceLoss(tf.ones_like(fakeLogits), fakeLogits)# Should be a shape of (batchSize, 1)
     ssimLoss = bceLoss(tf.zeros_like(ssim), ssim)
     return genLoss, ssimLoss
 
-def discriminatorLoss(realPredictions, fakePredictions):
+def discriminatorLoss(realLogits, fakeLogits):
     # Ones like because the label for real images is 1, and the discriminator wants to approach that with its predictions on the real images
-    discriminatorRealLoss = bceLoss(tf.ones_like(realPredictions), realPredictions)# Should be a shape of (batchSize, 1).
+    discriminatorRealLoss = bceLoss(tf.ones_like(realLogits), realLogits)# Should be a shape of (batchSize, 1).
     # Zeros like because the label for fake images is 0, and the discriminator wants to approach that with its predictions on the generators images
-    discriminatorFakeLoss = bceLoss(tf.zeros_like(fakePredictions), fakePredictions)# Should be a shape of (batchSize, 1).
+    discriminatorFakeLoss = bceLoss(tf.zeros_like(fakeLogits), fakeLogits)# Should be a shape of (batchSize, 1).
     return discriminatorRealLoss, discriminatorFakeLoss
 
 # Train step
@@ -100,13 +100,13 @@ def trainStep(images):
             # Build fake images
             fakeImages = generator(noise)
             # Get discriminator predictions
-            realPredictions = discriminator(images)
-            fakePredictions = discriminator(fakeImages)
+            realPredictions, realLogits = discriminator(images)
+            fakePredictions, fakeLogits = discriminator(fakeImages)
             # Calculate Multiscale Structural Similarity in Generator.
             ssim = calculateMultiscaleStructuralSimilarity()
         # Calculate losses
-        genLoss, genSimilarityLoss = generatorLoss(fakePredictions, ssim)
-        discRealLoss, discFakeLoss = discriminatorLoss(realPredictions, fakePredictions)
+        genLoss, genSimilarityLoss = generatorLoss(fakeLogits, ssim)
+        discRealLoss, discFakeLoss = discriminatorLoss(realLogits, fakeLogits)
         # Sum Losses. 
         genTotalLoss = genLoss + genSimilarityLoss
         discTotalLoss = discRealLoss + discFakeLoss
