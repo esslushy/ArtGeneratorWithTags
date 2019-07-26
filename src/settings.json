@@ -1,7 +1,7 @@
 {
     "epochs" : 200,
-    "batchSize" : 20,
-    "learningRate" : 0.0002,
+    "batchSize" : 25,
+    "learningRate" : 0.003,
     "images" : "../dataset/images/",
     "imageNames" : "../dataset/imageLocation.npy",
     "labels" : "../dataset/labels.npy",

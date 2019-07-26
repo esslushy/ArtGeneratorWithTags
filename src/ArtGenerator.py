@@ -68,16 +68,16 @@ discriminatorOptimizer = keras.optimizers.Adam(settings['learningRate'], beta_1=
 discriminatorRealImagesAccuracy = keras.metrics.BinaryAccuracy()
 discriminatorFakeImagesAccuracy = keras.metrics.BinaryAccuracy()
 
-def calculateMultiscaleStructuralSimilarity(labels):
+def calculateMultiscaleStructuralSimilarity(labels, images1):
     """
     Calculates the similarity between pairs of images made by the generator. Returns a set of values in the range [0, 1] where the closer to
     1 means the more similar the images. Large values returned from this means there has been mode collapse in the generator. This will be used
     as an extra metric during training to make sure the generator is learning properly.
     """
     # Create two sets of noise of size (batchSize, 100)
-    noise1, noise2 = tf.random.normal((labels.shape[0], 100), stddev=0.2), tf.random.normal((labels.shape[0], 100), stddev=0.2)
+    noise = tf.random.normal((labels.shape[0], 100))
     # Generate two sets of images
-    images1, images2 = generator((noise1, labels)), generator((noise2, labels))
+    images2 = generator((noise, labels))
     # Calculate the Multiscale Structural Similarity. max_val is 2 because the images range is [-1, 1]
     return tf.image.ssim_multiscale(images1, images2, 2)
 
@@ -114,14 +114,14 @@ def trainStep(images, labels):
             realPredictions, realLabelPredictions, realLogits, realLabelLogits = discriminator(images)
             fakePredictions, fakeLabelPredictions, fakeLogits, fakeLabelLogits = discriminator(fakeImages)
             # Calculate Multiscale Structural Similarity in Generator.
-            ssim = calculateMultiscaleStructuralSimilarity(labels)
-        # Calculate losses
-        genLoss = generatorLoss(fakeLogits)
-        discRealLoss, discFakeLoss = discriminatorLoss(realLogits, fakeLogits)
-        discRealLabelLoss, discFakeLabelLoss = discriminatorLabelLoss(realLabelLogits, fakeLabelLogits, labels)
-        # Sum Losses. 
-        genTotalLoss = genLoss + discFakeLabelLoss
-        discTotalLoss = discRealLoss + discFakeLoss + discRealLabelLoss + discFakeLabelLoss
+            ssim = calculateMultiscaleStructuralSimilarity(labels, fakeImages)
+            # Calculate losses
+            genLoss = generatorLoss(fakeLogits)
+            discRealLoss, discFakeLoss = discriminatorLoss(realLogits, fakeLogits)
+            discRealLabelLoss, discFakeLabelLoss = discriminatorLabelLoss(realLabelLogits, fakeLabelLogits, labels)
+            # Sum Losses. 
+            genTotalLoss = genLoss + discFakeLabelLoss
+            discTotalLoss = discRealLoss + discFakeLoss + discRealLabelLoss + discFakeLabelLoss
 
     # Collect Gradients
     generatorGradients = generatorTape.gradient(genTotalLoss, generator.trainable_variables)
@@ -146,8 +146,8 @@ def trainStep(images, labels):
     tf.summary.scalar('Generator_Realism_Loss', tf.reduce_mean(genLoss), step=globalStep)
     tf.summary.scalar('Generator_Total_Loss', tf.reduce_mean(genTotalLoss), step=globalStep)
     tf.summary.scalar('Generator_Mode_Collapse_Percentage', tf.reduce_mean(ssim), step=globalStep)
-    tf.summary.image('Generated_Images', fakeImages, max_outputs=8, step=globalStep)
-    
+    with tf.device('/gpu:0'): # Necessary for images
+        tf.summary.image('Generated_Images', fakeImages, max_outputs=8, step=globalStep)
 
 # Checkpoint Model
 checkpoint = tf.train.Checkpoint(generatorOptimizer=generatorOptimizer, discriminatorOptimizer=discriminatorOptimizer,
@@ -164,11 +164,10 @@ for epoch in range(settings['epochs']):
     print('On Epoch: ', epoch)
     for images, labels in dataset:
         # Train model and update tensorboard
-        with tf.device('/cpu:0'):
-            with writer.as_default(): # All summaries made during training will be saved to this writer
-                trainStep(images, labels, globalStep)
-                # Increment global step
-                globalStep+=1
+        with writer.as_default(): # All summaries made during training will be saved to this writer
+            trainStep(images, labels, globalStep)
+            # Increment global step
+            globalStep+=1
 
     # Checkpoint model each epoch
     manager.save(checkpoint_number=epoch)

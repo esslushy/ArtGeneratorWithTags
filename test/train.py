@@ -66,16 +66,16 @@ discriminatorOptimizer = keras.optimizers.Adam(settings['learningRate'], beta_1=
 discriminatorRealImagesAccuracy = keras.metrics.BinaryAccuracy()
 discriminatorFakeImagesAccuracy = keras.metrics.BinaryAccuracy()
 
-def calculateMultiscaleStructuralSimilarity():
+def calculateMultiscaleStructuralSimilarity(images1):
     """
     Calculates the similarity between pairs of images made by the generator. Returns a set of values in the range [0, 1] where the closer to
     1 means the more similar the images. Large values returned from this means there has been mode collapse in the generator. This will be used
     as an extra metric during training to make sure the generator is learning properly.
     """
     # Create two sets of noise of size (batchSize, 100)
-    noise1, noise2 = tf.random.normal((settings['batchSize'], 100), stddev=0.2), tf.random.normal((settings['batchSize'], 100), stddev=0.2)
+    noise = tf.random.normal((settings['batchSize'], 100))
     # Generate two sets of images
-    images1, images2 = generator(noise1), generator(noise2)
+    images2 = generator(noise)
     # Calculate the Multiscale Structural Similarity. max_val is 2 because the images range is [-1, 1]
     return tf.image.ssim_multiscale(images1, images2, 2)
 
@@ -106,7 +106,7 @@ def trainStep(images, globalStep):
             realPredictions, realLogits = discriminator(images)
             fakePredictions, fakeLogits = discriminator(fakeImages)
             # Calculate Multiscale Structural Similarity in Generator.
-            ssim = calculateMultiscaleStructuralSimilarity()
+            ssim = calculateMultiscaleStructuralSimilarity(fakeImages)
             # Calculate losses
             genLoss, genSimilarityLoss = generatorLoss(fakeLogits, ssim)
             discRealLoss, discFakeLoss = discriminatorLoss(realLogits, fakeLogits)
