@@ -74,9 +74,9 @@ def calculateMultiscaleStructuralSimilarity(labels, images1):
     1 means the more similar the images. Large values returned from this means there has been mode collapse in the generator. This will be used
     as an extra metric during training to make sure the generator is learning properly.
     """
-    # Create two sets of noise of size (batchSize, 100)
+    # Create a set of noise of size (batchSize, 100)
     noise = tf.random.normal((labels.shape[0], 100))
-    # Generate two sets of images
+    # Generate 2nd set of images
     images2 = generator((noise, labels))
     # Calculate the Multiscale Structural Similarity. max_val is 2 because the images range is [-1, 1]
     return tf.image.ssim_multiscale(images1, images2, 2)
@@ -103,7 +103,7 @@ def discriminatorLabelLoss(realLabelLogits, fakeLabelLogits, labels):
 
 # Train step
 @tf.function
-def trainStep(images, labels):
+def trainStep(images, labels, globalStep):
     # Makes a random noise distribution of (batchSize, 100)
     noise = tf.random.normal((images.shape[0], 100))
     with tf.GradientTape() as generatorTape, tf.GradientTape() as discriminatorTape:
@@ -146,13 +146,8 @@ def trainStep(images, labels):
     tf.summary.scalar('Generator_Realism_Loss', tf.reduce_mean(genLoss), step=globalStep)
     tf.summary.scalar('Generator_Total_Loss', tf.reduce_mean(genTotalLoss), step=globalStep)
     tf.summary.scalar('Generator_Mode_Collapse_Percentage', tf.reduce_mean(ssim), step=globalStep)
-    with tf.device('/gpu:0'): # Necessary for images
+    with tf.device('/cpu:0'): # Necessary for images
         tf.summary.image('Generated_Images', fakeImages, max_outputs=8, step=globalStep)
-
-# Checkpoint Model
-checkpoint = tf.train.Checkpoint(generatorOptimizer=generatorOptimizer, discriminatorOptimizer=discriminatorOptimizer,
-                                generator=generator, discriminator=discriminator)
-manager = tf.train.CheckpointManager(checkpoint, directory=settings['saveModel'] + 'checkpoints', max_to_keep=3, checkpoint_name='ckpt_epoch')#Keep only last 3 checkpoints of model
 
 # Summary Writer
 writer = tf.summary.create_file_writer(settings['tensorboardLocation'])
@@ -160,20 +155,21 @@ writer = tf.summary.create_file_writer(settings['tensorboardLocation'])
 tf.summary.experimental.set_step(0)
 
 # Training
-for epoch in range(settings['epochs']):
-    print('On Epoch: ', epoch)
-    for images, labels in dataset:
+with writer.as_default(): # All summaries made during training will be saved to this writer
+    for epoch in range(settings['epochs']):
+        print('On Epoch: ', epoch)
+        for images, labels in dataset:
         # Train model and update tensorboard
-        with writer.as_default(): # All summaries made during training will be saved to this writer
             trainStep(images, labels, globalStep)
             # Increment global step
             globalStep+=1
 
-    # Checkpoint model each epoch
-    manager.save(checkpoint_number=epoch)
-    # Reset metrics so that they accumalate per epoch instead of over the entire training period
-    discriminatorRealImagesAccuracy.reset_states()
-    discriminatorFakeImagesAccuracy.reset_states()
+        # Checkpoint model each epoch
+        tf.saved_model.save(generator, settings['saveModel'] + 'generator_' + epoch)
+        tf.saved_model.save(discriminator, settings['saveModel'] + 'discriminator_' + epoch)
+        # Reset metrics so that they accumalate per epoch instead of over the entire training period
+        discriminatorRealImagesAccuracy.reset_states()
+        discriminatorFakeImagesAccuracy.reset_states()
 
 # Save Final trained models in keras model format for easy reuse
 tf.saved_model.save(generator, settings['saveModel'] + 'generator')

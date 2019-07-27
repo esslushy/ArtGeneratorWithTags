@@ -72,9 +72,9 @@ def calculateMultiscaleStructuralSimilarity(images1):
     1 means the more similar the images. Large values returned from this means there has been mode collapse in the generator. This will be used
     as an extra metric during training to make sure the generator is learning properly.
     """
-    # Create two sets of noise of size (batchSize, 100)
-    noise = tf.random.normal((settings['batchSize'], 100))
-    # Generate two sets of images
+    # Create a set of noise of size (batchSize, 100)
+    noise = tf.random.normal((images1.shape[0], 100))
+    # Generate 2nd set of images
     images2 = generator(noise)
     # Calculate the Multiscale Structural Similarity. max_val is 2 because the images range is [-1, 1]
     return tf.image.ssim_multiscale(images1, images2, 2)
@@ -139,11 +139,6 @@ def trainStep(images, globalStep):
     with tf.device('/cpu:0'): # Necessary for images
         tf.summary.image('Generated_Images', fakeImages, max_outputs=8, step=globalStep)
 
-# Checkpoint Model
-checkpoint = tf.train.Checkpoint(generatorOptimizer=generatorOptimizer, discriminatorOptimizer=discriminatorOptimizer,
-                                generator=generator, discriminator=discriminator)
-manager = tf.train.CheckpointManager(checkpoint, directory=settings['saveModel'] + 'checkpoints', max_to_keep=3, checkpoint_name='ckpt_epoch')#Keep only last 3 checkpoints of model
-
 # Summary Writer
 writer = tf.summary.create_file_writer(settings['tensorboardLocation'])
 # Set Global Step
@@ -160,7 +155,8 @@ for epoch in range(settings['epochs']):
             globalStep+=1
 
     # Checkpoint model each epoch
-    manager.save(checkpoint_number=epoch)
+    tf.saved_model.save(generator, settings['saveModel'] + 'generator_' + epoch)
+    tf.saved_model.save(discriminator, settings['saveModel'] + 'discriminator_' + epoch)
     # Reset metrics so that they accumalate per epoch instead of over the entire training period
     discriminatorRealImagesAccuracy.reset_states()
     discriminatorFakeImagesAccuracy.reset_states()
