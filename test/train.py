@@ -55,9 +55,6 @@ dataset = dataset.prefetch(buffer_size=AUTOTUNE)
 generator = buildGenerator(training=True)
 discriminator = buildDiscriminator(training=True)
 
-# Loss Object. Categorical works with 2 or more
-bceLoss = keras.losses.BinaryCrossentropy(from_logits=True)
-
 #Optimizers
 generatorOptimizer = keras.optimizers.Adam(settings['learningRate'], beta_1=0.5)
 discriminatorOptimizer = keras.optimizers.Adam(settings['learningRate'], beta_1=0.5)
@@ -82,15 +79,15 @@ def calculateMultiscaleStructuralSimilarity(images1):
 # Loss functions
 def generatorLoss(fakeLogits, ssim):
     # Ones like because the label for real images is 1, and the generator wants to make its images as realistic as possible
-    genLoss = bceLoss(tf.ones_like(fakeLogits), fakeLogits + 1e-8)# Should be a shape of (batchSize, 1)
-    ssimLoss = bceLoss(tf.zeros_like(ssim), ssim)
+    genLoss = tf.nn.sigmoid_cross_entropy_with_logits(tf.ones_like(fakeLogits), fakeLogits)# Should be a shape of (batchSize, 1)
+    ssimLoss = tf.nn.sigmoid_cross_entropy_with_logits(tf.zeros_like(ssim), ssim)
     return genLoss, ssimLoss
 
 def discriminatorLoss(realLogits, fakeLogits):
     # Ones like because the label for real images is 1, and the discriminator wants to approach that with its predictions on the real images
-    discriminatorRealLoss = bceLoss(tf.ones_like(realLogits), realLogits + 1e-8)# Should be a shape of (batchSize, 1).
+    discriminatorRealLoss = tf.nn.sigmoid_cross_entropy_with_logits(tf.ones_like(realLogits), realLogits)# Should be a shape of (batchSize, 1).
     # Zeros like because the label for fake images is 0, and the discriminator wants to approach that with its predictions on the generators images
-    discriminatorFakeLoss = bceLoss(tf.zeros_like(fakeLogits), fakeLogits + 1e-8)# Should be a shape of (batchSize, 1).
+    discriminatorFakeLoss = tf.nn.sigmoid_cross_entropy_with_logits(tf.zeros_like(fakeLogits), fakeLogits)# Should be a shape of (batchSize, 1).
     return discriminatorRealLoss, discriminatorFakeLoss
 
 # Train step
@@ -154,12 +151,13 @@ for epoch in range(settings['epochs']):
             # Increment global step
             globalStep+=1
 
-    # Checkpoint model each epoch
-    tf.saved_model.save(generator, settings['saveModel'] + 'generator_' + epoch)
-    tf.saved_model.save(discriminator, settings['saveModel'] + 'discriminator_' + epoch)
-    # Reset metrics so that they accumalate per epoch instead of over the entire training period
-    discriminatorRealImagesAccuracy.reset_states()
-    discriminatorFakeImagesAccuracy.reset_states()
+    with tf.device('/cpu:0'):
+        # Checkpoint model each epoch
+        tf.saved_model.save(generator, settings['saveModel'] + 'generator_' + epoch)
+        tf.saved_model.save(discriminator, settings['saveModel'] + 'discriminator_' + epoch)
+        # Reset metrics so that they accumalate per epoch instead of over the entire training period
+        discriminatorRealImagesAccuracy.reset_states()
+        discriminatorFakeImagesAccuracy.reset_states()
 
 # Save Final trained models in keras model format for easy reuse
 tf.saved_model.save(generator, settings['saveModel'] + 'generator')
