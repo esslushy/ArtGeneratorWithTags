@@ -92,24 +92,23 @@ def discriminatorLoss(realLogits, fakeLogits):
 
 # Train step
 @tf.function
-def trainStep(images, globalStep):
+def trainStep(images, globalStep, writer):
     # Makes a random noise distribution of (batchSize, 100)
     noise = tf.random.normal((images.shape[0], 100))
     with tf.GradientTape() as generatorTape, tf.GradientTape() as discriminatorTape:
-        with tf.device('/gpu:0'):
-            # Build fake images
-            fakeImages = generator(noise)
-            # Get discriminator predictions
-            realPredictions, realLogits = discriminator(images)
-            fakePredictions, fakeLogits = discriminator(fakeImages)
-            # Calculate Multiscale Structural Similarity in Generator.
-            ssim = calculateMultiscaleStructuralSimilarity(fakeImages)
-            # Calculate losses
-            genLoss, genSimilarityLoss = generatorLoss(fakeLogits, ssim)
-            discRealLoss, discFakeLoss = discriminatorLoss(realLogits, fakeLogits)
-            # Sum Losses. 
-            genTotalLoss = genLoss + genSimilarityLoss
-            discTotalLoss = discRealLoss + discFakeLoss
+        # Build fake images
+        fakeImages = generator(noise)
+        # Get discriminator predictions
+        realPredictions, realLogits = discriminator(images)
+        fakePredictions, fakeLogits = discriminator(fakeImages)
+        # Calculate Multiscale Structural Similarity in Generator.
+        ssim = calculateMultiscaleStructuralSimilarity(fakeImages)
+        # Calculate losses
+        genLoss, genSimilarityLoss = generatorLoss(fakeLogits, ssim)
+        discRealLoss, discFakeLoss = discriminatorLoss(realLogits, fakeLogits)
+        # Sum Losses. 
+        genTotalLoss = genLoss + genSimilarityLoss
+        discTotalLoss = discRealLoss + discFakeLoss
 
     # Collect Gradients
     generatorGradients = generatorTape.gradient(genTotalLoss, generator.trainable_variables)
@@ -124,37 +123,38 @@ def trainStep(images, globalStep):
     discriminatorFakeImagesAccuracy.update_state(tf.zeros_like(fakePredictions), fakePredictions)
 
     # Log to tensorboard
-    tf.summary.scalar('Discriminator_Real_Images_Loss', tf.reduce_mean(discRealLoss), step=globalStep)
-    tf.summary.scalar('Discriminator_Fake_Images_Loss', tf.reduce_mean(discFakeLoss), step=globalStep)
-    tf.summary.scalar('Discriminator_Total_Loss', tf.reduce_mean(discTotalLoss), step=globalStep)
-    tf.summary.scalar('Discriminator_Real_Images_Accuracy', discriminatorRealImagesAccuracy.result(), step=globalStep)
-    tf.summary.scalar('Discriminator_Fake_Images_Accuracy', discriminatorFakeImagesAccuracy.result(), step=globalStep)
-    tf.summary.scalar('Generator_Realism_Loss', tf.reduce_mean(genLoss), step=globalStep)
-    tf.summary.scalar('Generator_Mode_Collapse_Loss', tf.reduce_mean(genSimilarityLoss), step=globalStep)
-    tf.summary.scalar('Generator_Total_Loss', tf.reduce_mean(genTotalLoss), step=globalStep)
-    tf.summary.scalar('Generator_Mode_Collapse_Percentage', tf.reduce_mean(ssim), step=globalStep)
-    with tf.device('/cpu:0'): # Necessary for images
+    with tf.device('/cpu:0'), writer.as_default(): # Necessary for images. Helps reduce gpu load
+        tf.summary.scalar('Discriminator_Real_Images_Loss', tf.reduce_mean(discRealLoss), step=globalStep)
+        tf.summary.scalar('Discriminator_Fake_Images_Loss', tf.reduce_mean(discFakeLoss), step=globalStep)
+        tf.summary.scalar('Discriminator_Total_Loss', tf.reduce_mean(discTotalLoss), step=globalStep)
+        tf.summary.scalar('Discriminator_Real_Images_Accuracy', discriminatorRealImagesAccuracy.result(), step=globalStep)
+        tf.summary.scalar('Discriminator_Fake_Images_Accuracy', discriminatorFakeImagesAccuracy.result(), step=globalStep)
+        tf.summary.scalar('Generator_Realism_Loss', tf.reduce_mean(genLoss), step=globalStep)
+        tf.summary.scalar('Generator_Mode_Collapse_Loss', tf.reduce_mean(genSimilarityLoss), step=globalStep)
+        tf.summary.scalar('Generator_Total_Loss', tf.reduce_mean(genTotalLoss), step=globalStep)
+        tf.summary.scalar('Generator_Mode_Collapse_Percentage', tf.reduce_mean(ssim), step=globalStep)
         tf.summary.image('Generated_Images', fakeImages, max_outputs=8, step=globalStep)
 
 # Summary Writer
 writer = tf.summary.create_file_writer(settings['tensorboardLocation'])
-# Set Global Step
-tf.summary.experimental.set_step(0)
+
+# Checkpoint Model
+checkpoint = tf.train.Checkpoint(generatorOptimizer=generatorOptimizer, discriminatorOptimizer=discriminatorOptimizer,
+                                generator=generator, discriminator=discriminator)
+manager = tf.train.CheckpointManager(checkpoint, directory=settings['saveModel'] + 'checkpoint_', max_to_keep=3, checkpoint_name='ckpt_epoch')#Keep only last 3 checkpoints of model
 
 # Training
 for epoch in range(settings['epochs']):
     print('On Epoch: ', epoch)
     for images in dataset:
         # Train model and update tensorboard
-        with writer.as_default(): # All summaries made during training will be saved to this writer
-            trainStep(images, globalStep)
-            # Increment global step
-            globalStep+=1
+        trainStep(images, globalStep, writer)
+        # Increment global step
+        globalStep+=1
 
     with tf.device('/cpu:0'):
         # Checkpoint model each epoch
-        tf.saved_model.save(generator, settings['saveModel'] + 'generator_' + epoch)
-        tf.saved_model.save(discriminator, settings['saveModel'] + 'discriminator_' + epoch)
+        manager.save(checkpoint_number=epoch)
         # Reset metrics so that they accumalate per epoch instead of over the entire training period
         discriminatorRealImagesAccuracy.reset_states()
         discriminatorFakeImagesAccuracy.reset_states()

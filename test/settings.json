@@ -1,6 +1,6 @@
 {
     "epochs" : 200,
-    "batchSize" : 25,
+    "batchSize" : 32,
     "learningRate" : 0.002,
     "images" : "..\\dataset\\images\\",
     "imageNames" : "..\\dataset\\imageLocation.npy",
