@@ -46,7 +46,7 @@ dataset = tf.data.Dataset.from_tensor_slices(np.load(settings['imageNames'], all
 dataset = dataset.map(loadAndPreprocessImage, num_parallel_calls=AUTOTUNE)# Places images into datast
 # Prep dataset for training
 dataset = dataset.cache()#This helps improve performance
-dataset = dataset.batch(settings['batchSize'])
+dataset = dataset.batch(settings['batchSize'], drop_remainder=True)
 dataset = dataset.prefetch(buffer_size=AUTOTUNE)
 
 # Build models
@@ -138,8 +138,7 @@ def trainStep(images, writer, globalStep):
     globalStep.assign_add(1)
 
 @tf.function
-def trainEpoch(epoch, dataset, writer, globalStep):
-    print('On Epoch: ', epoch)
+def trainEpoch(dataset, writer, globalStep):
     for images in dataset:
         # Train model and update tensorboard
         trainStep(images, writer, globalStep)
@@ -164,7 +163,8 @@ globalStep = tf.Variable(initial_value=0, dtype=tf.int64)
 
 # Training
 for epoch in range(settings['epochs']):
-    trainEpoch(epoch, dataset, writer, globalStep)
+    print(f'Epoch: {epoch}')
+    trainEpoch(dataset, writer, globalStep)
 
 # Save Final trained models in keras model format for easy reuse
 tf.saved_model.save(generator, settings['saveModel'] + 'generator')
