@@ -161,6 +161,12 @@ manager = tf.train.CheckpointManager(checkpoint, directory=settings['saveModel']
 # Setup global step
 globalStep = tf.Variable(initial_value=0, dtype=tf.int64)
 
+# Restore model if exists
+if settings['restore']:
+    # Run everything once to create variables
+    trainStep(next(iter(dataset)), writer, globalStep)
+    checkpoint.restore(manager.latest_checkpoint).assert_consumed()
+
 # Training
 for epoch in range(settings['epochs']):
     print(f'Epoch: {epoch}')
