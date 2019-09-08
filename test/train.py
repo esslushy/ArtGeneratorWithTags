@@ -88,7 +88,7 @@ def discriminatorLoss(realLogits, fakeLogits):
     return discriminatorRealLoss, discriminatorFakeLoss
 
 # Train step
-def trainStep(images, writer, step, globalStep):
+def trainStep(images, writer, batchNum, globalStep):
     # Run on gpu
     with tf.device('/gpu:0'):
         # Makes a random noise distribution of (batchSize, 100)
@@ -120,7 +120,7 @@ def trainStep(images, writer, step, globalStep):
         discriminatorRealImagesAccuracy.update_state(tf.ones_like(realPredictions), realPredictions)
         discriminatorFakeImagesAccuracy.update_state(tf.zeros_like(fakePredictions), fakePredictions)
 
-    if step % 150 == 0:
+    if batchNum % 150 == 0:
         # Log to tensorboard
         with tf.device('/cpu:0'), writer.as_default(): # Necessary for images. Helps reduce gpu load
             tf.summary.scalar('Discriminator_Real_Images_Loss', tf.reduce_mean(discRealLoss), step=globalStep)
@@ -139,9 +139,9 @@ def trainStep(images, writer, step, globalStep):
 
 @tf.function
 def trainEpoch(dataset, writer, globalStep):
-    for step, images in dataset.enumerate():
+    for batchNum, images in dataset.enumerate():
         # Train model and update tensorboard
-        trainStep(images, writer, step, globalStep)
+        trainStep(images, writer, batchNum, globalStep)
         
     with tf.device('/cpu:0'):
         # Checkpoint model each epoch
