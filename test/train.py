@@ -120,7 +120,7 @@ def trainStep(images, writer, step, globalStep):
         discriminatorRealImagesAccuracy.update_state(tf.ones_like(realPredictions), realPredictions)
         discriminatorFakeImagesAccuracy.update_state(tf.zeros_like(fakePredictions), fakePredictions)
 
-    if step % 150:
+    if step % 150 == 0:
         # Log to tensorboard
         with tf.device('/cpu:0'), writer.as_default(): # Necessary for images. Helps reduce gpu load
             tf.summary.scalar('Discriminator_Real_Images_Loss', tf.reduce_mean(discRealLoss), step=globalStep)
