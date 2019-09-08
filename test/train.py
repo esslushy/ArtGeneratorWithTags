@@ -21,9 +21,9 @@ arguments = parser.parse_args()
 with open(arguments.settings, 'r') as f:
     settings = json.load(f)
 
-# # Standardize randomness
-# tf.random.set_seed(7)
-# np.random.seed(7)
+# Standardize randomness
+tf.random.set_seed(7)
+np.random.seed(7)
 
 # Set prefetch buffer for dataloading
 AUTOTUNE = tf.data.experimental.AUTOTUNE
@@ -33,7 +33,6 @@ def loadAndPreprocessImage(path):
     # Load image
     image = tf.io.read_file(settings['images'] + path)
     image = tf.image.decode_jpeg(image, channels=3)
-    image = tf.image.resize(image, (128, 128))
     image = tf.cast(image, tf.float32)
     # Normalize to [-1, 1] range
     image = image - (255.0/2.0)
@@ -89,7 +88,7 @@ def discriminatorLoss(realLogits, fakeLogits):
     return discriminatorRealLoss, discriminatorFakeLoss
 
 # Train step
-def trainStep(images, writer, globalStep):
+def trainStep(images, writer, step, globalStep):
     # Run on gpu
     with tf.device('/gpu:0'):
         # Makes a random noise distribution of (batchSize, 100)
@@ -121,27 +120,28 @@ def trainStep(images, writer, globalStep):
         discriminatorRealImagesAccuracy.update_state(tf.ones_like(realPredictions), realPredictions)
         discriminatorFakeImagesAccuracy.update_state(tf.zeros_like(fakePredictions), fakePredictions)
 
-    # Log to tensorboard
-    with tf.device('/cpu:0'), writer.as_default(): # Necessary for images. Helps reduce gpu load
-        tf.summary.scalar('Discriminator_Real_Images_Loss', tf.reduce_mean(discRealLoss), step=globalStep)
-        tf.summary.scalar('Discriminator_Fake_Images_Loss', tf.reduce_mean(discFakeLoss), step=globalStep)
-        tf.summary.scalar('Discriminator_Total_Loss', tf.reduce_mean(discTotalLoss), step=globalStep)
-        tf.summary.scalar('Discriminator_Real_Images_Accuracy', discriminatorRealImagesAccuracy.result(), step=globalStep)
-        tf.summary.scalar('Discriminator_Fake_Images_Accuracy', discriminatorFakeImagesAccuracy.result(), step=globalStep)
-        tf.summary.scalar('Generator_Realism_Loss', tf.reduce_mean(genLoss), step=globalStep)
-        tf.summary.scalar('Generator_Mode_Collapse_Loss', tf.reduce_mean(genSimilarityLoss), step=globalStep)
-        tf.summary.scalar('Generator_Total_Loss', tf.reduce_mean(genTotalLoss), step=globalStep)
-        tf.summary.scalar('Generator_Mode_Collapse_Percentage', tf.reduce_mean(ssim), step=globalStep)
-        tf.summary.image('Generated_Images', fakeImages, max_outputs=8, step=globalStep)
+    if step % 150:
+        # Log to tensorboard
+        with tf.device('/cpu:0'), writer.as_default(): # Necessary for images. Helps reduce gpu load
+            tf.summary.scalar('Discriminator_Real_Images_Loss', tf.reduce_mean(discRealLoss), step=globalStep)
+            tf.summary.scalar('Discriminator_Fake_Images_Loss', tf.reduce_mean(discFakeLoss), step=globalStep)
+            tf.summary.scalar('Discriminator_Total_Loss', tf.reduce_mean(discTotalLoss), step=globalStep)
+            tf.summary.scalar('Discriminator_Real_Images_Accuracy', discriminatorRealImagesAccuracy.result(), step=globalStep)
+            tf.summary.scalar('Discriminator_Fake_Images_Accuracy', discriminatorFakeImagesAccuracy.result(), step=globalStep)
+            tf.summary.scalar('Generator_Realism_Loss', tf.reduce_mean(genLoss), step=globalStep)
+            tf.summary.scalar('Generator_Mode_Collapse_Loss', tf.reduce_mean(genSimilarityLoss), step=globalStep)
+            tf.summary.scalar('Generator_Total_Loss', tf.reduce_mean(genTotalLoss), step=globalStep)
+            tf.summary.scalar('Generator_Mode_Collapse_Percentage', tf.reduce_mean(ssim), step=globalStep)
+            tf.summary.image('Generated_Images', fakeImages, max_outputs=8, step=globalStep)
 
-    # Increment step
-    globalStep.assign_add(1)
+        # Increment step
+        globalStep.assign_add(1)
 
 @tf.function
 def trainEpoch(dataset, writer, globalStep):
-    for images in dataset:
+    for step, images in dataset.enumerate():
         # Train model and update tensorboard
-        trainStep(images, writer, globalStep)
+        trainStep(images, writer, step, globalStep)
         
     with tf.device('/cpu:0'):
         # Checkpoint model each epoch
