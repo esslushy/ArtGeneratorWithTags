@@ -110,7 +110,7 @@ def discriminatorLoss(realLogits, fakeLogits):
     return discriminatorRealLoss, discriminatorFakeLoss
 
 # Train step
-@tf.function(input_signature=[tf.TensorSpec(shape=(256, 256, 3), dtype=tf.float32)])
+@tf.function
 def trainStep(images):
     # Makes a random noise distribution of (batchSize, 100)
     noise = tf.random.normal((settings['batchSize'], 100))
