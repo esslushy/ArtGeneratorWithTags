@@ -159,7 +159,8 @@ for epoch in range(settings['epochs']):
     print(f'Epoch: {epoch}')
     for batchNum, images in dataset.enumerate():
         # Train model
-        discRealLoss, discFakeLoss, discTotalLoss, genLoss, genSimilarityLoss, genTotalLoss, ssim, fakeImages = trainStep(images)
+        with tf.device('/gpu:0'):
+            discRealLoss, discFakeLoss, discTotalLoss, genLoss, genSimilarityLoss, genTotalLoss, ssim, fakeImages = trainStep(images)
 
         if batchNum % 150 == 0:
             logToTensorboard(discRealLoss, discFakeLoss, discTotalLoss, genLoss, genSimilarityLoss, genTotalLoss, ssim, fakeImages)
