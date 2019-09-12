@@ -67,7 +67,7 @@ discriminatorFakeImagesAccuracy = keras.metrics.BinaryAccuracy()
 
 # Tensorboard logging
 def logToTensorboard(discRealLoss, discFakeLoss, discTotalLoss, genLoss, genSimilarityLoss, genTotalLoss, ssim, fakeImages):
-    with writer.as_default(): # Necessary for images. Helps reduce gpu load
+    with writer.as_default():
         tf.summary.scalar('Discriminator_Real_Images_Loss', tf.reduce_mean(discRealLoss), step=globalStep)
         tf.summary.scalar('Discriminator_Fake_Images_Loss', tf.reduce_mean(discFakeLoss), step=globalStep)
         tf.summary.scalar('Discriminator_Total_Loss', tf.reduce_mean(discTotalLoss), step=globalStep)
