@@ -67,7 +67,7 @@ discriminatorFakeImagesAccuracy = keras.metrics.BinaryAccuracy()
 
 # Tensorboard logging
 def logToTensorboard(discRealLoss, discFakeLoss, discTotalLoss, genLoss, genSimilarityLoss, genTotalLoss, ssim, fakeImages):
-    with writer.as_default(), tf.device('/cpu:0'): # Necessary for images. Helps reduce gpu load
+    with writer.as_default(): # Necessary for images. Helps reduce gpu load
         tf.summary.scalar('Discriminator_Real_Images_Loss', tf.reduce_mean(discRealLoss), step=globalStep)
         tf.summary.scalar('Discriminator_Fake_Images_Loss', tf.reduce_mean(discFakeLoss), step=globalStep)
         tf.summary.scalar('Discriminator_Total_Loss', tf.reduce_mean(discTotalLoss), step=globalStep)
@@ -158,7 +158,7 @@ if settings['restore']:
 @tf.function
 def train(epochs):
     for epoch in tf.range(epochs):
-        tf.print(f'Epoch: {epoch}')
+        tf.print('Epoch: ', epoch)
         for batchNum, images in dataset.enumerate():
             # Train model on gpu
             with tf.device('/gpu:0'):
@@ -175,7 +175,9 @@ def train(epochs):
         discriminatorFakeImagesAccuracy.reset_states()
 
 # Call training function
-train(settings['epochs'])
+with tf.device('/cpu:0'):
+    # Will run all code on cpu unless otherwise specified.
+    train(settings['epochs'])
 
 # Save Final trained models in saved model format for easy reuse
 tf.saved_model.save(generator, settings['saveModel'] + 'generator')
