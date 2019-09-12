@@ -156,7 +156,7 @@ if settings['restore']:
 
 # Training Function. This has to be wrapped in a tf function to avoid a memory leak from tf data iteration
 @tf.function
-def train(epochs):
+def train(epochs, dataset):
     for epoch in tf.range(epochs):
         tf.print('Epoch: ', epoch)
         for batchNum, images in dataset.enumerate():
@@ -176,7 +176,7 @@ def train(epochs):
 # Call training function
 with tf.device('/cpu:0'):
     # Will run all code on cpu unless otherwise specified.
-    train(settings['epochs'])
+    train(settings['epochs'], dataset)
 
 # Save Final trained models in saved model format for easy reuse
 tf.saved_model.save(generator, settings['saveModel'] + 'generator')
