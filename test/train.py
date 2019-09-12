@@ -157,7 +157,7 @@ if settings['restore']:
 # Training Function. This has to be wrapped in a tf function to avoid a memory leak from tf data iteration
 @tf.function
 def train(epochs):
-    for epoch in range(epochs):
+    for epoch in tf.range(epochs):
         tf.print(f'Epoch: {epoch}')
         for batchNum, images in dataset.enumerate():
             # Train model on gpu
