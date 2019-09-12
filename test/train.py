@@ -164,9 +164,8 @@ def train(epochs):
             with tf.device('/gpu:0'):
                 discRealLoss, discFakeLoss, discTotalLoss, genLoss, genSimilarityLoss, genTotalLoss, ssim, fakeImages = trainStep(images)
 
-            if batchNum % 150 == 0:
-                # Every 150 batches log to tensorboard
-                logToTensorboard(discRealLoss, discFakeLoss, discTotalLoss, genLoss, genSimilarityLoss, genTotalLoss, ssim, fakeImages)
+            # Every 150 batches log to tensorboard
+            tf.cond(batchNum % 150 == 0, logToTensorboard(discRealLoss, discFakeLoss, discTotalLoss, genLoss, genSimilarityLoss, genTotalLoss, ssim, fakeImages))
 
         # Checkpoint model each epoch
         tf.py_function(manager.save, [], [tf.string])
