@@ -67,7 +67,7 @@ discriminatorFakeImagesAccuracy = keras.metrics.BinaryAccuracy()
 
 # Tensorboard logging
 def logToTensorboard(discRealLoss, discFakeLoss, discTotalLoss, genLoss, genSimilarityLoss, genTotalLoss, ssim, fakeImages):
-    with writer.as_default(): # Necessary for images. Helps reduce gpu load
+    with writer.as_default(), tf.device('/cpu:0'): # Necessary for images. Helps reduce gpu load
         tf.summary.scalar('Discriminator_Real_Images_Loss', tf.reduce_mean(discRealLoss), step=globalStep)
         tf.summary.scalar('Discriminator_Fake_Images_Loss', tf.reduce_mean(discFakeLoss), step=globalStep)
         tf.summary.scalar('Discriminator_Total_Loss', tf.reduce_mean(discTotalLoss), step=globalStep)
@@ -154,23 +154,28 @@ if settings['restore']:
     trainStep(next(iter(dataset)))
     checkpoint.restore(manager.latest_checkpoint).assert_consumed()
 
-# Training
-for epoch in range(settings['epochs']):
-    print(f'Epoch: {epoch}')
-    with tf.device('/cpu:0'): # Ensures everything is run off gpu except for the actual training
+# Training Function. This has to be wrapped in a tf function to avoid a memory leak from tf data iteration
+@tf.function
+def train():
+    for epoch in range(settings['epochs']):
+        print(f'Epoch: {epoch}')
         for batchNum, images in dataset.enumerate():
-            # Train model
+            # Train model on gpu
             with tf.device('/gpu:0'):
                 discRealLoss, discFakeLoss, discTotalLoss, genLoss, genSimilarityLoss, genTotalLoss, ssim, fakeImages = trainStep(images)
 
             if batchNum % 150 == 0:
+                # Every 150 batches log to tensorboard
                 logToTensorboard(discRealLoss, discFakeLoss, discTotalLoss, genLoss, genSimilarityLoss, genTotalLoss, ssim, fakeImages)
 
-            # Checkpoint model each epoch
-            tf.py_function(manager.save, [], [tf.string])
-            # Reset metrics so that they accumalate per epoch instead of over the entire training period
-            discriminatorRealImagesAccuracy.reset_states()
-            discriminatorFakeImagesAccuracy.reset_states()
+        # Checkpoint model each epoch
+        tf.py_function(manager.save, [], [tf.string])
+        # Reset metrics so that they accumalate per epoch instead of over the entire training period
+        discriminatorRealImagesAccuracy.reset_states()
+        discriminatorFakeImagesAccuracy.reset_states()
+
+# Call training function
+train()
 
 # Save Final trained models in saved model format for easy reuse
 tf.saved_model.save(generator, settings['saveModel'] + 'generator')
