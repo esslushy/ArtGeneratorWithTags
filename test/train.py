@@ -110,7 +110,7 @@ def discriminatorLoss(realLogits, fakeLogits):
     return discriminatorRealLoss, discriminatorFakeLoss
 
 # Train step
-@tf.function(input_signature=[tf.TensorSpec(shape=(None, 256, 256, 3), dtype=tf.float32)])
+@tf.function(input_signature=[tf.TensorSpec(shape=(settings['batchSize'], 256, 256, 3), dtype=tf.float32)])
 def trainStep(images):
     # Makes a random noise distribution of (batchSize, 100)
     noise = tf.random.normal((settings['batchSize'], 100))
@@ -156,9 +156,9 @@ if settings['restore']:
 
 # Training Function. This has to be wrapped in a tf function to avoid a memory leak from tf data iteration
 @tf.function
-def train():
-    for epoch in range(settings['epochs']):
-        print(f'Epoch: {epoch}')
+def train(epochs):
+    for epoch in range(epochs):
+        tf.print(f'Epoch: {epoch}')
         for batchNum, images in dataset.enumerate():
             # Train model on gpu
             with tf.device('/gpu:0'):
@@ -175,7 +175,7 @@ def train():
         discriminatorFakeImagesAccuracy.reset_states()
 
 # Call training function
-train()
+train(settings['epochs'])
 
 # Save Final trained models in saved model format for easy reuse
 tf.saved_model.save(generator, settings['saveModel'] + 'generator')
