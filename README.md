@@ -5,7 +5,7 @@ A remake of my old Abstract Art Generator in Tensorflow 2.0 that accepts user in
 - A dedicated gpu from nvidia.
 - python 3.6.7+
 - Tensorflow Gpu 2.0+
-- pathlib
+- pathlib  
 An easy install requirements.txt is included so that you can run pip -r install requirements.txt.
 
 # Setup
