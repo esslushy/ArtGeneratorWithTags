@@ -2,7 +2,7 @@ import tensorflow as tf
 from tensorflow import keras
 
 def ResizeConvolutionLayer(x, size, filters):
-    x = keras.layers.Lambda(tf.image.resize, arguments={'size' : size})(x)
+    x = tf.image.resize(x, size)
     x = keras.layers.Conv2D(filters=filters, kernel_size=4, strides=1, padding='same', 
                             kernel_initializer=tf.keras.initializers.GlorotNormal(7))(x)
     return x
