@@ -89,7 +89,7 @@ def discriminatorLoss(realLogits, fakeLogits):
     return discriminatorRealLoss, discriminatorFakeLoss
 
 # Train step
-def trainStep(images, writer, globalStep):
+def trainStep(batchNum, images):
     # Run on gpu
     with tf.device('/gpu:0'):
         # Makes a random noise distribution of (batchSize, 100)
@@ -121,27 +121,28 @@ def trainStep(images, writer, globalStep):
         discriminatorRealImagesAccuracy.update_state(tf.ones_like(realPredictions), realPredictions)
         discriminatorFakeImagesAccuracy.update_state(tf.zeros_like(fakePredictions), fakePredictions)
 
-    # Log to tensorboard
-    with tf.device('/cpu:0'), writer.as_default(): # Necessary for images. Helps reduce gpu load
-        tf.summary.scalar('Discriminator_Real_Images_Loss', tf.reduce_mean(discRealLoss), step=globalStep)
-        tf.summary.scalar('Discriminator_Fake_Images_Loss', tf.reduce_mean(discFakeLoss), step=globalStep)
-        tf.summary.scalar('Discriminator_Total_Loss', tf.reduce_mean(discTotalLoss), step=globalStep)
-        tf.summary.scalar('Discriminator_Real_Images_Accuracy', discriminatorRealImagesAccuracy.result(), step=globalStep)
-        tf.summary.scalar('Discriminator_Fake_Images_Accuracy', discriminatorFakeImagesAccuracy.result(), step=globalStep)
-        tf.summary.scalar('Generator_Realism_Loss', tf.reduce_mean(genLoss), step=globalStep)
-        tf.summary.scalar('Generator_Mode_Collapse_Loss', tf.reduce_mean(genSimilarityLoss), step=globalStep)
-        tf.summary.scalar('Generator_Total_Loss', tf.reduce_mean(genTotalLoss), step=globalStep)
-        tf.summary.scalar('Generator_Mode_Collapse_Percentage', tf.reduce_mean(ssim), step=globalStep)
-        tf.summary.image('Generated_Images', fakeImages, max_outputs=8, step=globalStep)
+    # Log to tensorboard every 150 batches
+    if batchNum % 150 == 0:
+        with tf.device('/cpu:0'), writer.as_default(): # Necessary for images. Helps reduce gpu load
+            tf.summary.scalar('Discriminator_Real_Images_Loss', tf.reduce_mean(discRealLoss), step=globalStep)
+            tf.summary.scalar('Discriminator_Fake_Images_Loss', tf.reduce_mean(discFakeLoss), step=globalStep)
+            tf.summary.scalar('Discriminator_Total_Loss', tf.reduce_mean(discTotalLoss), step=globalStep)
+            tf.summary.scalar('Discriminator_Real_Images_Accuracy', discriminatorRealImagesAccuracy.result(), step=globalStep)
+            tf.summary.scalar('Discriminator_Fake_Images_Accuracy', discriminatorFakeImagesAccuracy.result(), step=globalStep)
+            tf.summary.scalar('Generator_Realism_Loss', tf.reduce_mean(genLoss), step=globalStep)
+            tf.summary.scalar('Generator_Mode_Collapse_Loss', tf.reduce_mean(genSimilarityLoss), step=globalStep)
+            tf.summary.scalar('Generator_Total_Loss', tf.reduce_mean(genTotalLoss), step=globalStep)
+            tf.summary.scalar('Generator_Mode_Collapse_Percentage', tf.reduce_mean(ssim), step=globalStep)
+            tf.summary.image('Generated_Images', fakeImages, max_outputs=8, step=globalStep)
 
-    # Increment step
-    globalStep.assign_add(1)
+        # Increment step
+        globalStep.assign_add(1)
 
 @tf.function
-def trainEpoch(dataset, writer, globalStep):
-    for images in dataset:
+def trainEpoch():
+    for batchNum, images in dataset.enumerate():
         # Train model and update tensorboard
-        trainStep(images, writer, globalStep)
+        trainStep(batchNum, images)
         
     with tf.device('/cpu:0'):
         # Checkpoint model each epoch
@@ -164,13 +165,13 @@ globalStep = tf.Variable(initial_value=0, dtype=tf.int64)
 # Restore model if exists
 if settings['restore']:
     # Run everything once to create variables
-    trainStep(next(iter(dataset)), writer, globalStep)
+    trainStep(-1, next(iter(dataset)))
     checkpoint.restore(manager.latest_checkpoint).assert_consumed()
 
 # Training
 for epoch in range(settings['epochs']):
     print(f'Epoch: {epoch}')
-    trainEpoch(dataset, writer, globalStep)
+    trainEpoch()
 
 # Save Final trained models in keras model format for easy reuse
 tf.saved_model.save(generator, settings['saveModel'] + 'generator')

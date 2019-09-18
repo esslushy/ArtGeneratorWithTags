@@ -6,5 +6,5 @@
     "imageNames" : "..\\dataset\\imageLocation.npy",
     "tensorboardLocation" : ".\\info\\run1\\",
     "saveModel" : ".\\model\\run1\\",
-    "restore" : true
+    "restore" : false
 }
