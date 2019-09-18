@@ -143,7 +143,7 @@ def trainStep(batchNum, images):
             tf.summary.scalar('Generator_Mode_Collapse_Loss', tf.reduce_mean(genSimilarityLoss), step=globalStep)
             tf.summary.scalar('Generator_Total_Loss', tf.reduce_mean(genTotalLoss), step=globalStep)
             tf.summary.scalar('Generator_Mode_Collapse_Percentage', tf.reduce_mean(ssim), step=globalStep)
-            tf.summary.image('Generated_Images', fakeImages, max_outputs=4, step=globalStep)
+            tf.summary.image('Generated_Images', fakeImages, max_outputs=8, step=globalStep)
 
         # Increment global step
         globalStep.assign_add(1)
