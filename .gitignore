@@ -112,3 +112,4 @@ cache/
 info/
 model/
 *.tf-data
+data_cache*

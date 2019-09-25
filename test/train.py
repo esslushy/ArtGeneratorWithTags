@@ -49,7 +49,7 @@ def loadAndPreprocessImage(path):
 dataset = tf.data.Dataset.from_tensor_slices(np.load(settings['imageNames'], allow_pickle=True))#Gets all image paths
 dataset = dataset.map(loadAndPreprocessImage, num_parallel_calls=AUTOTUNE)# Places images into datast
 # Prep dataset for training
-dataset = dataset.cache()#This helps improve performance
+dataset = dataset.cache(filename='cache/data_cache')#This helps improve performance
 dataset = dataset.batch(settings['batchSize'], drop_remainder=True)
 dataset = dataset.prefetch(buffer_size=AUTOTUNE)
 

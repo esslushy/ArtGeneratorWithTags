@@ -1,10 +1,10 @@
 {
-    "epochs" : 200,
+    "epochs" : 100,
     "batchSize" : 32,
     "learningRate" : 0.0002,
-    "images" : "..\\dataset\\images\\",
-    "imageNames" : "..\\dataset\\imageLocation.npy",
+    "images" : "..\\dataset\\watercolor\\",
+    "imageNames" : "..\\dataset\\watercolorLocation.npy",
     "tensorboardLocation" : ".\\info\\run1\\",
     "saveModel" : ".\\model\\run1\\",
-    "restore" : false
+    "restore" : true
 }
