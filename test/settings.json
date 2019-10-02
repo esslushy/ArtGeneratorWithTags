@@ -6,5 +6,6 @@
     "imageNames" : "..\\dataset\\watercolorLocation.npy",
     "tensorboardLocation" : ".\\info\\run1\\",
     "saveModel" : ".\\model\\run1\\",
+    "mssimScore": false,
     "restore" : false
 }

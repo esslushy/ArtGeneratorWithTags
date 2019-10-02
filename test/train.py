@@ -110,13 +110,13 @@ def trainStep(batchNum, images):
             # Get discriminator predictions
             realPredictions, realLogits = discriminator(images)
             fakePredictions, fakeLogits = discriminator(fakeImages)
-            # Calculate Multiscale Structural Similarity in Generator.
+            # Calculate Multiscale Structural Similarity in Generator if desired.
             ssim = calculateMultiscaleStructuralSimilarity(fakeImages)
             # Calculate losses
             genLoss, genSimilarityLoss = generatorLoss(fakeLogits, ssim)
             discRealLoss, discFakeLoss = discriminatorLoss(realLogits, fakeLogits)
-            # Sum Losses. 
-            genTotalLoss = genLoss + genSimilarityLoss
+            # Sum Losses. Use only ms-ssim loss if desired
+            genTotalLoss = genLoss + genSimilarityLoss if settings['mssimScore'] else genLoss
             discTotalLoss = discRealLoss + discFakeLoss
 
         # Collect Gradients
