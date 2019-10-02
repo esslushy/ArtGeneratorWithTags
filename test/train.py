@@ -116,7 +116,10 @@ def trainStep(batchNum, images):
             genLoss, genSimilarityLoss = generatorLoss(fakeLogits, ssim)
             discRealLoss, discFakeLoss = discriminatorLoss(realLogits, fakeLogits)
             # Sum Losses. Use only ms-ssim loss if desired
-            genTotalLoss = genLoss + genSimilarityLoss if settings['mssimScore'] else genLoss
+            if settings['mssimScore']:
+                genTotalLoss = genLoss + genSimilarityLoss 
+            else:
+                genTotalLoss = genLoss
             discTotalLoss = discRealLoss + discFakeLoss
 
         # Collect Gradients
