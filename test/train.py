@@ -67,7 +67,7 @@ discriminatorFakeImagesAccuracy = keras.metrics.BinaryAccuracy()
 
 # Model Checkpoint and Manager
 checkpoint = tf.train.Checkpoint(generatorOptimizer=generatorOptimizer, discriminatorOptimizer=discriminatorOptimizer,
-                                generator=generator, discriminator=discriminator)
+                                generator=generator, discriminator=discriminator, globalStep=globalStep)
 manager = tf.train.CheckpointManager(checkpoint, directory=settings['saveModel'], max_to_keep=3, checkpoint_name='ckpt_epoch')#Keep only last 3 checkpoints of model
 
 def calculateMultiscaleStructuralSimilarity(images1):
