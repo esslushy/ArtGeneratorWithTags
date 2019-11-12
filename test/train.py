@@ -173,7 +173,11 @@ if settings['restore']:
 # Training
 for epoch in range(settings['epochs']):
     print(f'Epoch: {epoch}')
-    trainEpoch()
+    try:
+        trainEpoch()
+    except tf.errors.DataLossError as e:
+        # If checksums fail try training again
+        trainEpoch()
 
 # Save Final trained models in keras model format for easy reuse
 tf.saved_model.save(generator, settings['saveModel'] + 'generator')

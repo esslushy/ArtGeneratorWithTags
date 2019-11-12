@@ -1,5 +1,5 @@
 {
-    "epochs" : 75,
+    "epochs" : 183,
     "batchSize" : 32,
     "learningRate" : 0.0002,
     "images" : "..\\dataset\\watercolor\\",
@@ -7,5 +7,5 @@
     "tensorboardLocation" : ".\\info\\run1\\",
     "saveModel" : ".\\model\\run1\\",
     "mssimScore": false,
-    "restore" : false
+    "restore" : true
 }
